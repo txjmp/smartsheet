@@ -1,13 +1,11 @@
 package smartsheet
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"strconv"
 )
 
@@ -38,7 +36,7 @@ type SheetInfo struct {
 // Load method downloads sheet info by calling GetSheet func and pulling data from the returned sheet info.
 // Optional GetSheetOptions is defined in smartsheet.go.
 // If only specific columns are needed, options.ColumnNames are converted to ColumnIds
-func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) {
+func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) error {
 
 	if options == nil {
 		options = new(GetSheetOptions)
@@ -50,7 +48,8 @@ func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) {
 	}
 	sheet, err := GetSheet(sheetId, options)
 	if err != nil {
-		log.Panicln("SheetInfo.load failed", she.SheetName, she.SheetId, err)
+		log.Println("SheetInfo.load failed", she.SheetName, she.SheetId, err)
+		return err
 	}
 	she.SheetId = sheet.Id
 	she.SheetName = sheet.Name
@@ -66,6 +65,7 @@ func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) {
 		she.ColumnsByName[column.Title] = column
 		she.ColumnsByIndex[column.Index] = column
 	}
+	return nil
 }
 
 // MatchSheet compares this sheetInfo instance to another instance and returns true if they match.
@@ -172,7 +172,7 @@ func (she *SheetInfo) AddRow(newCells []NewCell, lockRow ...bool) error {
 // A row consists of rowId, slice of NewCell objects, and optional lockRow indicator.
 // Only include lockRow if row is to be locked(true) or unlocked(false).
 // All updated rows are processed in a batch using UploadUpdateRows() method.
-func (she *SheetInfo) UpdateRow(rowId int64, newCells []NewCell, lockRow ...bool) {
+func (she *SheetInfo) UpdateRow(rowId int64, newCells []NewCell, lockRow ...bool) error {
 
 	var locked *bool // if lockRow not specified, locked is nil (not false)
 	if len(lockRow) > 0 {
@@ -190,7 +190,8 @@ func (she *SheetInfo) UpdateRow(rowId int64, newCells []NewCell, lockRow ...bool
 	for i, newCell := range newCells {
 		column, found := she.ColumnsByName[newCell.ColName]
 		if !found {
-			log.Panicln("ERROR - SheetInfo.UpdateRow column not found", she.SheetName, newCell.ColName)
+			log.Println("ERROR - SheetInfo.UpdateRow column not found", she.SheetName, newCell.ColName)
+			return errors.New("Invalid ColumnName - " + newCell.ColName)
 		}
 		newRow.Cells[i] = Cell{
 			ColumnId:  column.Id,
@@ -203,6 +204,7 @@ func (she *SheetInfo) UpdateRow(rowId int64, newCells []NewCell, lockRow ...bool
 		she.UpdateRows = make([]Row, 0, 100)
 	}
 	she.UpdateRows = append(she.UpdateRows, newRow)
+	return nil
 }
 
 // UploadNewRows adds new rows to sheet using SheetInfo.NewRows.
@@ -218,7 +220,7 @@ func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...stri
 	}
 	// -- Create Request Body ----------------
 	type reqItem map[string]interface{}
-	request := make([]reqItem, 0, len(she.NewRows))
+	reqData := make([]reqItem, 0, len(she.NewRows))
 
 	for _, newRow := range she.NewRows {
 		item := make(reqItem)
@@ -247,80 +249,84 @@ func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...stri
 		if location.Outdent != 0 {
 			item["outdent"] = 1
 		}
-		request = append(request, item)
+		reqData = append(reqData, item)
 	}
-
-	reqBytes, _ := json.Marshal(request)
-	debugLn("request body ---")
-	debugLn(string(reqBytes))
-
-	// -- Process Upload Request -----
-	url := fmt.Sprintf(basePath+"/sheets/%d/rows", she.SheetId)
-	debugLn("url", url)
-
-	reqBody := bytes.NewReader(reqBytes)
-	req, _ := http.NewRequest("POST", url, reqBody)
+	endPoint := fmt.Sprintf("/sheets/%d/rows", she.SheetId)
+	req := Post(endPoint, reqData, nil)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := performRequest(req, false)
-	defer httpResp.Body.Close()
+	resp, err := DoRequest(req)
 	if err != nil {
-		log.Printf("%+v\n", httpResp)
-		//log.Panicln("ERROR - SheetInfo.UploadNewRows failed", err)
+		return nil, err
 	}
-	responseJSON, _ := ioutil.ReadAll(httpResp.Body)
-	response := new(AddUpdtRowsResponse) // same response object when adding or updating rows
-	json.Unmarshal(responseJSON, response)
+	defer resp.Body.Close()
 
-	debugLn("response ---")
-	debugObj(response)
+	respJSON, _ := ioutil.ReadAll(resp.Body)
+	result1 := new(AddUpdtRowsResponse) // same response object when adding or updating rows
+	err = json.Unmarshal(respJSON, result1)
+	if err != nil {
+		log.Println("ERROR - UploadAddRows Unmarshal Response Failed", err)
+		return nil, err
+	}
 
+	defer func() {
+		she.NewRows = nil
+	}()
+	if len(rowLevelField) == 0 {
+		return result1, nil
+	}
 	// -------------------------------------------------------------------
 	// IF OPTIONAL ROWLEVELFIELD SPECIFIED, SET PARENTID ON CHILD ROWS
 	//   parent rows: Level 0
 	//   child rows: Level 1
 	//   child rows must be immediately after parent row in response
-	if len(rowLevelField) > 0 {
-		debugLn("Set ParentId on Child Rows ---")
-		var parentId int64
-		var childIds []int64
-		for _, row := range response.Result {
-			rowLevel := she.GetRowLevel(row, rowLevelField[0])
-			debugLn("rowLevel", rowLevel)
-			if rowLevel == "0" { // if header row
-				if len(childIds) > 0 {
-					SetParentId(she, parentId, childIds) // indent child rows for prev parent
-				}
-				parentId = row.Id
-				childIds = make([]int64, 0, 20)
-				continue
-			}
-			if parentId != 0 && rowLevel == "1" {
-				childIds = append(childIds, row.Id)
-			}
+	debugLn("Set ParentId on Child Rows ---")
+	var parentId int64
+	var childIds []int64
+	for _, row := range result1.Result {
+		rowLevel, err := she.GetRowLevel(row, rowLevelField[0])
+		if err != nil {
+			return result1, err
 		}
-		if len(childIds) > 0 {
-			SetParentId(she, parentId, childIds) // indent child rows for prev parent
+		debugLn("rowLevel", rowLevel)
+		if rowLevel == "0" { // if header row
+			if len(childIds) > 0 {
+				err = SetParentId(she, parentId, childIds) // indent child rows for prev parent
+				childIds = make([]int64, 0, 20)
+				if err != nil {
+					break
+				}
+			}
+			parentId = row.Id
+			continue
+		}
+		if parentId != 0 && rowLevel == "1" {
+			childIds = append(childIds, row.Id)
 		}
 	}
-	she.NewRows = nil
-	return response, err
+	if len(childIds) > 0 {
+		err = SetParentId(she, parentId, childIds) // indent child rows for prev parent
+	}
+	return result1, err
 }
 
 // getRowLevel returns the value of cell containing a rows parent-child indicator.
 // Parm rowLevelField is the column name, for example "Level".
-// Currently method UploadNewRows() expects Parent row value to be "0" and Child row value to be "1".
-func (she *SheetInfo) GetRowLevel(row Row, rowLevelField string) string {
+// If cell does not exist, empty string is returned.
+func (she *SheetInfo) GetRowLevel(row Row, rowLevelField string) (string, error) {
 	column, found := she.ColumnsByName[rowLevelField]
 	if !found {
-		log.Panicln("SheetInfo.GetRowLevel invalid rowLevelFld", rowLevelField)
+		log.Println("ERROR - SheetInfo.GetRowLevel invalid rowLevelFld", rowLevelField)
+		return "", errors.New("Invalid RowLevel Field")
 	}
+	rowLevel := ""
 	for _, cell := range row.Cells {
 		if cell.ColumnId == column.Id {
-			return cell.Value.(string)
+			rowLevel = cell.Value.(string)
+			break
 		}
 	}
-	return ""
+	return rowLevel, nil
 }
 
 // UploadUpdateRows updates rows using SheetInfo.UpdateRows.
@@ -331,7 +337,7 @@ func (she *SheetInfo) UploadUpdateRows(location *RowLocation) (*AddUpdtRowsRespo
 
 	// -- Create Request Body ----------------
 	type reqItem map[string]interface{}
-	request := make([]reqItem, 0, len(she.UpdateRows))
+	reqData := make([]reqItem, 0, len(she.UpdateRows))
 
 	for _, updateRow := range she.UpdateRows {
 		item := make(reqItem)
@@ -363,37 +369,27 @@ func (she *SheetInfo) UploadUpdateRows(location *RowLocation) (*AddUpdtRowsRespo
 		if location.Outdent != 0 {
 			item["outdent"] = 1
 		}
-		request = append(request, item)
+		reqData = append(reqData, item)
 	}
-	reqBytes, _ := json.Marshal(request)
-	debugLn("request body ---")
-	debugLn(string(reqBytes))
-
-	// -- Process Upload Request -----
-	url := fmt.Sprintf(basePath+"/sheets/%d/rows", she.SheetId)
-	fmt.Println("url", url)
-
-	reqBody := bytes.NewReader(reqBytes)
-	req, _ := http.NewRequest("PUT", url, reqBody)
+	endPoint := fmt.Sprintf("/sheets/%d/rows", she.SheetId)
+	req := Put(endPoint, reqData, nil)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := performRequest(req, false)
-	defer httpResp.Body.Close()
+	resp, err := DoRequest(req)
 	if err != nil {
-		log.Printf("%+v\n", httpResp)
-		//log.Panicln("ERROR - SheetInfo.UploadUpdateRows failed", err)
+		return nil, err
 	}
-	responseJSON, _ := ioutil.ReadAll(httpResp.Body)
-	response := new(AddUpdtRowsResponse) // same response object when adding or updating rows
-	json.Unmarshal(responseJSON, response)
+	defer resp.Body.Close()
 
+	respJSON, _ := ioutil.ReadAll(resp.Body)
+	result := new(AddUpdtRowsResponse) // same response object when adding or updating rows
+	err = json.Unmarshal(respJSON, result)
+	if err != nil {
+		log.Println("ERROR - UploadUpdateRows Unmarshal Response Failed", err)
+		return nil, err
+	}
 	she.UpdateRows = nil
-	return response, err
-}
-
-// CopyOptions is used by CopyRows to indicate what elements (in addition to cells) are copied to the destination sheet.
-type CopyOptions struct {
-	All, Attachments, Children, Discussions bool // specify All or any mix of other options
+	return result, err
 }
 
 // CreateCrossSheetReference creates an external-sheet-reference required for cross sheet formulas.
@@ -401,16 +397,11 @@ type CopyOptions struct {
 func (she *SheetInfo) CreateCrossSheetReference(ref *CrossSheetReference) error {
 	trace("CreateCrossSheetReference")
 
-	reqBytes, _ := json.Marshal(ref)
-	reqBody := bytes.NewReader(reqBytes)
-	debugLn("request body ---")
-	debugLn(string(reqBytes))
-
-	url := fmt.Sprintf(basePath+"/sheets/%d/crosssheetreferences", she.SheetId)
-	req, _ := http.NewRequest("POST", url, reqBody)
+	endPoint := fmt.Sprintf("/sheets/%d/crosssheetreferences", she.SheetId)
+	req := Post(endPoint, ref, nil)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := performRequest(req, false)
+	httpResp, err := DoRequest(req)
 	if err != nil {
 		fmt.Println("ERROR - CreateCrossSheetReference request failed", err)
 	}
@@ -479,7 +470,7 @@ func (she *SheetInfo) UploadIndentRows() (*AddUpdtRowsResponse, error) {
 	req, _ := http.NewRequest("PUT", url, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := performRequest(req, false)
+	httpResp, err := DoRequest(req)
 	if err != nil {
 		fmt.Println("xxx request failed", err)
 	}

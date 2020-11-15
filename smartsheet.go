@@ -1,9 +1,7 @@
 package smartsheet
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -23,16 +21,7 @@ var TraceOn bool = false
 var isTrue bool = true // address of this var is used when setting boolean pointer values
 var isFalse bool = false
 
-var RequestDelay time.Duration = 1 * time.Second // delay between API requests, maximum of 100 requests per minute
-
 type m bson.M
-
-var tokenIndex int
-var tokens = []string{
-	"Bearer iaio1on056ri3ajvqt6wcjxjwq",
-}
-
-const basePath = "https://api.smartsheet.com/2.0"
 
 const (
 	EGNYTE = "EGNYTE"
@@ -67,72 +56,60 @@ func GetSheet(sheetId int64, options *GetSheetOptions) (*Sheet, error) {
 	if options == nil {
 		options = new(GetSheetOptions)
 	}
+	debugLn("GetSheetOptions ---")
 	debugObj(options)
 
-	var err error
-	url := fmt.Sprintf(basePath+"/sheets/%d", sheetId)
-	req, _ := http.NewRequest("GET", url, nil)
+	endPoint := fmt.Sprintf("/sheets/%d", sheetId)
 
-	qryParms := req.URL.Query() // Get a copy of the url query string
-	qryParms.Add("exclude", "nonexistentCells")
-
+	urlParms := make(map[string]string)
+	urlParms["exclude"] = "nonexistentCells"
 	if len(options.RowIds) > 0 {
 		rowIds := make([]string, len(options.RowIds))
 		for i, rowId := range options.RowIds {
 			rowIds[i] = fmt.Sprintf("%d", rowId)
 		}
-		qryParms.Add("rowIds", strings.Join(rowIds, ","))
+		urlParms["rowIds"] = strings.Join(rowIds, ",")
 	}
-
 	if len(options.ColumnIds) > 0 {
 		colIds := make([]string, len(options.ColumnIds))
 		for i, colId := range options.ColumnIds {
 			colIds[i] = fmt.Sprintf("%d", colId)
 		}
-		qryParms.Add("columnIds", strings.Join(colIds, ","))
+		urlParms["columnIds"] = strings.Join(colIds, ",")
 	}
-
 	if !options.RowsModifiedSince.IsZero() {
-		qryParms.Add("rowsModifiedSince", options.RowsModifiedSince.Format(time.RFC3339))
+		urlParms["rowsModifiedSince"] = options.RowsModifiedSince.Format(time.RFC3339)
 	}
-
 	if options.RowsModifiedMins > 0 {
 		d := time.Duration(options.RowsModifiedMins) * time.Minute // convert mins to duration type & compute duration
 		rowsModifiedSince := time.Now().Add(-d).Format(time.RFC3339)
-		debugLn("rowsModifiedSince", rowsModifiedSince)
-		qryParms.Add("rowsModifiedSince", rowsModifiedSince)
+		debugLn("rowsModifiedSince: ", rowsModifiedSince)
+		urlParms["rowsModifiedSince"] = rowsModifiedSince
 	}
-
-	req.URL.RawQuery = qryParms.Encode() // Encode and assign back to the original query.
-	debugLn("URL: ", req.URL)
-
-	resp, err := performRequest(req, false)
+	req := Get(endPoint, urlParms)
+	resp, err := DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	responseJSON, _ := ioutil.ReadAll(resp.Body)
-	debugLn(string(responseJSON))
+	respJSON, _ := ioutil.ReadAll(resp.Body)
 
-	response := new(Sheet)
-
-	err = json.Unmarshal(responseJSON, response)
+	sheet := new(Sheet)
+	err = json.Unmarshal(respJSON, sheet)
 	if err != nil {
-		log.Panicln("Smartsheet LoadSheet JSON Unmarshal Error - ", err)
+		log.Panicln("GetSheet JSON Unmarshal Error - ", err)
 	}
-	debugObj(response)
-
-	return response, err
+	return sheet, err
 }
 
 // GetSheetRows creates csv file containing row data, 1st line is column headers.
 func GetSheetRows(sheetId int64, filePath string) error {
 
-	url := fmt.Sprintf(basePath+"/sheets/%d", sheetId)
-	req, _ := http.NewRequest("GET", url, nil)
+	endPoint := fmt.Sprintf("/sheets/%d", sheetId)
+	req := Get(endPoint, nil)
 	req.Header.Set("Accept", "text/csv")
 
-	resp, err := performRequest(req, false)
+	resp, err := DoRequest(req)
 	if err != nil {
 		return err
 	}
@@ -157,31 +134,25 @@ func GetSheetRows(sheetId int64, filePath string) error {
 func GetRow(sheetId, rowId int64) (*Row, error) {
 	trace("GetRow")
 
-	url := fmt.Sprintf(basePath+"/sheets/%d/rows/%d", sheetId, rowId)
-	req, _ := http.NewRequest("GET", url, nil)
+	urlParms := make(map[string]string)
+	urlParms["exclude"] = "nonexistentCells"
 
-	qryParms := req.URL.Query() // Get a copy of the url query string
-	qryParms.Add("exclude", "nonexistentCells")
-	req.URL.RawQuery = qryParms.Encode() // Encode and assign back to the original query.
+	endPoint := fmt.Sprintf("/sheets/%d/rows/%d", sheetId, rowId)
+	req := Get(endPoint, urlParms)
 
-	debugLn("URL: ", req.URL.RawQuery)
-
-	resp, err := performRequest(req, false)
+	resp, err := DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	respJSON, _ := ioutil.ReadAll(resp.Body)
 
-	responseJSON, _ := ioutil.ReadAll(resp.Body)
-	response := new(Row)
-
-	err = json.Unmarshal(responseJSON, response)
+	row := new(Row)
+	err = json.Unmarshal(respJSON, row)
 	if err != nil {
-		log.Panicln("Smartsheet GetRow JSON Unmarshal Error - ", err)
+		log.Panicln("GetRow JSON Unmarshal Error - ", err)
 	}
-	debugObj(response)
-
-	return response, err
+	return row, err
 }
 
 // RowValues returns a single row's cell values as map[string]string.
@@ -238,55 +209,56 @@ func CellInfo(sheet *SheetInfo, row Row, columnName string) *Cell {
 	return response
 }
 
+// CopyOptions is used by CopyRows to indicate what elements (in addition to cells) are copied to the destination sheet.
+type CopyOptions struct {
+	All, Attachments, Children, Discussions bool // specify All or any mix of other options
+}
+
 // CopyRows copies specified rows from 1 sheet to another.
 // Optional CopyOptions indicates what elements, attached to each row, are included.
 // If CopyOptions is nil, only the row cells are copied.
-func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyOptions) (string, error) {
+func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyOptions) error {
 	trace("CopyRows")
-	var request struct {
+	var reqData struct {
 		RowIds []int64 `json:"rowIds"`
 		To     struct {
 			SheetId int64 `json:"sheetId"`
 		} `json:"to"`
 	}
-	request.RowIds = rowIds
-	request.To.SheetId = toSheetId
+	reqData.RowIds = rowIds
+	reqData.To.SheetId = toSheetId
 
-	reqBytes, _ := json.Marshal(request)
-	reqBody := bytes.NewReader(reqBytes)
-	debugLn("request body ---")
-	debugLn(string(reqBytes))
-
-	url := fmt.Sprintf(basePath+"/sheets/%d/rows/copy", fromSheetId)
-	debugLn("url", url)
-
-	req, _ := http.NewRequest("POST", url, reqBody)
-
+	var urlParms map[string]string
 	if options != nil {
-		qryParms := req.URL.Query() // Get a copy of the query string.
+		ops := make([]string, 0, 3)
 		if options.All {
-			qryParms.Add("include", "all")
+			ops = append(ops, "all")
 		} else {
 			if options.Attachments {
-				qryParms.Add("include", "attachments")
+				ops = append(ops, "attachments")
 			}
 			if options.Children {
-				qryParms.Add("include", "children")
+				ops = append(ops, "children")
 			}
 			if options.Discussions {
-				qryParms.Add("include", "discussions")
+				ops = append(ops, "discussions")
 			}
 		}
-		req.URL.RawQuery = qryParms.Encode() // Encode and assign back to the original query.
-		debugLn("CopyRows url qrystring", req.URL.RawQuery)
+		if len(ops) > 0 {
+			urlParms = make(map[string]string)
+			urlParms["include"] = strings.Join(ops, ",")
+		}
 	}
-	httpResp, err := performRequest(req, false)
+	endPoint := fmt.Sprintf("/sheets/%d/rows/copy", fromSheetId)
+	req := Post(endPoint, reqData, urlParms)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := DoRequest(req)
 	if err != nil {
-		return "", err
+		return err
 	}
-	defer httpResp.Body.Close()
-	responseJSON, _ := ioutil.ReadAll(httpResp.Body)
-	return string(responseJSON), err // currently just returning the response as a string, for debugging
+	resp.Body.Close()
+	return nil
 }
 
 // MoveOptions is used by MoveRows to indicate what elements (in addition to cells) are copied to the destination sheet.
@@ -297,45 +269,41 @@ type MoveOptions struct {
 // MoveRows moves specified rows from 1 sheet to another.
 // Optional MoveOptions indicates what elements, attached to each row, are included. Child rows are always included.
 // If MoveOptions is nil, only the row cells are moved.
-func MoveRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *MoveOptions) (string, error) {
+func MoveRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *MoveOptions) error {
 	trace("MoveRows")
-	var request struct {
+	var reqData struct {
 		RowIds []int64 `json:"rowIds"`
 		To     struct {
 			SheetId int64 `json:"sheetId"`
 		} `json:"to"`
 	}
-	request.RowIds = rowIds
-	request.To.SheetId = toSheetId
+	reqData.RowIds = rowIds
+	reqData.To.SheetId = toSheetId
 
-	reqBytes, _ := json.Marshal(request)
-	reqBody := bytes.NewReader(reqBytes)
-	debugLn("request body ---")
-	debugLn(string(reqBytes))
-
-	url := fmt.Sprintf(basePath+"/sheets/%d/rows/move", fromSheetId)
-	debugLn("url", url)
-
-	req, _ := http.NewRequest("POST", url, reqBody)
-
+	var urlParms map[string]string
 	if options != nil {
-		qryParms := req.URL.Query() // Get a copy of the query string.
+		ops := make([]string, 0, 2)
 		if options.Attachments {
-			qryParms.Add("include", "attachments")
+			ops = append(ops, "attachments")
 		}
 		if options.Discussions {
-			qryParms.Add("include", "discussions")
+			ops = append(ops, "discussions")
 		}
-		req.URL.RawQuery = qryParms.Encode() // Encode and assign back to the original query.
-		debugLn("MoveRows url qrystring", req.URL.RawQuery)
+		if len(ops) > 0 {
+			urlParms = make(map[string]string)
+			urlParms["include"] = strings.Join(ops, ",")
+		}
 	}
-	httpResp, err := performRequest(req, false)
+	endPoint := fmt.Sprintf("/sheets/%d/rows/move", fromSheetId)
+	req := Post(endPoint, reqData, urlParms)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := DoRequest(req)
 	if err != nil {
-		return "", err
+		return err
 	}
-	defer httpResp.Body.Close()
-	responseJSON, _ := ioutil.ReadAll(httpResp.Body)
-	return string(responseJSON), err // currently just returning the response as a string, for debugging
+	resp.Body.Close()
+	return nil
 }
 
 // SetParentId sets parent (indents) specified child rows.
@@ -349,53 +317,44 @@ func SetParentId(sheet *SheetInfo, parentId int64, childIds []int64, toBottom ..
 		log.Println("SetParentId - No ChildIds Specified")
 		return nil
 	}
-	// Create Request Body
 	type reqItem struct {
 		Id       int64 `json:"id"`
 		ParentId int64 `json:"parentId"`
 		ToBottom *bool `json:"toBottom,omitempty"`
 	}
-	request := make([]reqItem, len(childIds))
+	reqData := make([]reqItem, len(childIds))
 
 	for i, childId := range childIds {
-		request[i] = reqItem{Id: childId, ParentId: parentId}
+		reqData[i] = reqItem{Id: childId, ParentId: parentId}
 	}
 	if len(toBottom) > 0 && len(childIds) == 1 && toBottom[0] {
-		request[0].ToBottom = &isTrue
+		reqData[0].ToBottom = &isTrue
 	}
-	reqBytes, _ := json.Marshal(request)
-	debugLn("request body ---")
-	debugLn(string(reqBytes))
-
-	// Process Upload Request
-	url := fmt.Sprintf(basePath+"/sheets/%d/rows", sheet.SheetId)
-	debugLn("url", url)
-
-	reqBody := bytes.NewReader(reqBytes)
-	req, _ := http.NewRequest("PUT", url, reqBody)
+	endPoint := fmt.Sprintf("/sheets/%d/rows", sheet.SheetId)
+	req := Put(endPoint, reqData, nil)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := performRequest(req, false)
-	defer httpResp.Body.Close()
-
+	resp, err := DoRequest(req)
 	if err != nil {
-		responseJSON, _ := ioutil.ReadAll(httpResp.Body)
-		log.Println("SetParentId Failed ---\n", string(responseJSON))
+		return err
 	}
-	return err
+	resp.Body.Close()
+	return nil
 }
 
 // GetCrossSheetRefs displays cross sheet ref info for sheet.
-func GetCrossSheetRefs(sheetId int64) {
-	url := fmt.Sprintf(basePath+"/sheets/%d/crosssheetreferences", sheetId)
-	req, _ := http.NewRequest("GET", url, nil)
-	httpResp, err := performRequest(req, false)
+func GetCrossSheetRefs(sheetId int64) error {
+	endPoint := fmt.Sprintf("/sheets/%d/crosssheetreferences", sheetId)
+	req := Get(endPoint, nil)
+
+	resp, err := DoRequest(req)
 	if err != nil {
-		fmt.Println("xxx GetCrossSheetRefs failed", err)
+		return err
 	}
-	defer httpResp.Body.Close()
-	responseJSON, _ := ioutil.ReadAll(httpResp.Body)
-	fmt.Println("-- CrossSheetRefs --\n", string(responseJSON))
+	defer resp.Body.Close()
+	respJSON, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("-- CrossSheetRefs --\n", string(respJSON))
+	return nil
 }
 
 // AttachFileToRow attaches file to row.
@@ -420,19 +379,17 @@ func AttachFileToRow(sheetId, rowId int64, filePath string) error {
 	debugLn("fileSize", fileSize)
 
 	url := fmt.Sprintf(basePath+"/sheets/%d/rows/%d/attachments", sheetId, rowId)
-	debugLn("url", url)
-
 	req, _ := http.NewRequest("POST", url, file)
 	req.Header.Set("Content-Type", "") // let Smartsheet figure out from fileName
 	req.Header.Set("Content-Disposition", "attachment; filename="+fileName)
 	req.Header.Set("Content-Length", fileSize)
 
-	httpResp, err := performRequest(req, false)
-	defer httpResp.Body.Close()
-
-	debugObj(httpResp)
-
-	return err
+	resp, err := DoRequest(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
 }
 
 // AttachUrlToRow attaches url link to a row.
@@ -441,52 +398,25 @@ func AttachUrlToRow(sheetId, rowId int64, fileName, attachmentType, linkUrl stri
 
 	//'{"name":"Search Engine", "description": "A popular search engine", "attachmentType":"LINK", "url":"http://www.google.com"}'
 
-	var request = struct {
+	var reqData struct {
 		Name           string `json:"name"`
 		AttachmentType string `json:"attachmentType"` // LINK, BOX_COM, DROPBOX, EGNYTE, EVERNOTE, GOOGLE_DRIVE, ONEDRIVE
 		Url            string `json:"url"`
-	}{
-		Name:           fileName,
-		AttachmentType: attachmentType,
-		Url:            linkUrl,
 	}
-	reqBytes, _ := json.Marshal(&request)
-	reqBody := bytes.NewReader(reqBytes)
+	reqData.Name = fileName
+	reqData.AttachmentType = attachmentType
+	reqData.Url = linkUrl
 
-	url := fmt.Sprintf(basePath+"/sheets/%d/rows/%d/attachments", sheetId, rowId)
-	req, _ := http.NewRequest("POST", url, reqBody)
+	endPoint := fmt.Sprintf("/sheets/%d/rows/%d/attachments", sheetId, rowId)
+	req := Post(endPoint, reqData, nil)
 	req.Header.Set("Content-Type", "application/json") // let Smartsheet figure out from fileName
 
-	httpResp, err := performRequest(req, false)
-	defer httpResp.Body.Close()
-
-	debugObj(httpResp)
-
-	return err
-}
-
-func performRequest(req *http.Request, closeBody bool) (*http.Response, error) {
-	tokenIndex += 1
-	if tokenIndex >= len(tokens) {
-		tokenIndex = 0
-	}
-	req.Header.Set("Authorization", tokens[tokenIndex])
-	client := http.Client{}
-	client.Timeout = time.Second * 120
-	resp, err := client.Do(req)
+	resp, err := DoRequest(req)
 	if err != nil {
-		log.Println("Smartsheet Error, HTTP Request Failed - ", err)
-		log.Println(resp.Header)
-		return nil, err
+		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return resp, errors.New(resp.Status)
-	}
-	if closeBody {
-		resp.Body.Close()
-	}
-	time.Sleep(RequestDelay) // limit number of requests per minute
-	return resp, nil
+	resp.Body.Close()
+	return nil
 }
 
 func trace(stepName string) {
@@ -536,7 +466,7 @@ func MultiAttachFile() {
 
 		req.Header.Set("Content-Type", contentType)
 		w.Header().Set("Content-Disposition", "attachment; filename=Wiki.png")
-		_, err = performRequest(req, true)
+		_, err = DoRequest(req, true)
 
 		return err
 
