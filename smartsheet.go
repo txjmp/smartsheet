@@ -129,32 +129,6 @@ func GetSheetRows(sheetId int64, filePath string) error {
 	return err
 }
 
-// GetRow returns specified row from sheet.
-// ### add code to handle row not found
-func GetRow(sheetId, rowId int64) (*Row, error) {
-	trace("GetRow")
-
-	urlParms := make(map[string]string)
-	urlParms["exclude"] = "nonexistentCells"
-
-	endPoint := fmt.Sprintf("/sheets/%d/rows/%d", sheetId, rowId)
-	req := Get(endPoint, urlParms)
-
-	resp, err := DoRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	respJSON, _ := ioutil.ReadAll(resp.Body)
-
-	row := new(Row)
-	err = json.Unmarshal(respJSON, row)
-	if err != nil {
-		log.Panicln("GetRow JSON Unmarshal Error - ", err)
-	}
-	return row, err
-}
-
 // RowValues returns a single row's cell values as map[string]string.
 // The key of each entry is column name.
 // If cell contains hyperlink, the url is returned as entry value.

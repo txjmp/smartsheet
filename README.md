@@ -8,13 +8,11 @@ The SheetInfo type contains most of the information about a sheet including defi
 
 GoDoc documentation will provide complete type and func details. This document is intended to explain functionality in a more concise and easy to understand format.
 
-Using existing code as a pattern, I can implement most other API features quickly.
-
 ## Examples
 
 ### Create an instance of SheetInfo, Load It Via the API, Store It, and Show It
 ```
-sheetX := new(smartsheet.SheetInfo)
+sheetX := new(SheetInfo)
 
 sheetX.Load(sheetXId, nil)  // sheetXId contains the sheet id, nil indicates no GET sheet options
 
@@ -25,7 +23,7 @@ sheetX.Show(5) // display sheet id, name, column names/types and rows (limit to 
 
 ### Verify SheetInfo Columns & Types Match a Base Version
 ```
-sheetXBase := new(smartsheet.SheetInfo)
+sheetXBase := new(SheetInfo)
 
 sheetXBase.Restore("sheets/sheetx_base.json")  // restore from json encrypted file
 
@@ -43,7 +41,7 @@ type GetSheetOptions struct {
 }
 
 rowIds := []int64{6840477608372100, 23866684047796654, 684898239820023}
-options := smartsheet.GetSheetOptions{ 
+options := GetSheetOptions{ 
     RowIds: rowIds,
     ColumnNames: []string{"Customer", "Location"},
 }
@@ -64,15 +62,15 @@ type NewCell struct {
 }
 
 // -- Add Parent Row -----------------------------------------
-newRow := []smartsheet.NewCell{
+newRow := []NewCell{
 	{ColName: "Step", Value: "Start" },
 	{ColName: "Level", Value: "0"},  // parent indicator
 }
 err = sheet.AddRow(newRow)
 
 // -- Add Child Row -----------------------------------------
-linkedDoc := &smartsheet.Hyperlink{Url:"https://..."}  // linkedDoc is pointer
-newRow := []smartsheet.NewCell{
+linkedDoc := &Hyperlink{Url:"https://..."}  // linkedDoc is pointer
+newRow := []NewCell{
 	{ColName: "Step", Value: "Start" },
 	{ColName: "Level", Value: "1"},  // child indicator
 	{ColName: "Phase", Value: "Design"},
@@ -115,7 +113,7 @@ type RowLocation struct {
 	Outdent 	int
 }
 
-rowLocation := smartsheet.RowLocation{ToTop:true}
+rowLocation := RowLocation{ToTop:true}
 sheetX.UploadNewRows( &rowLocation )
 
 ```
@@ -123,13 +121,13 @@ sheetX.UploadNewRows( &rowLocation )
 Updated rows are first added to SheetInfo.UpdateRows slice using UpdateRow method.
 UploadUpdateRows updates sheet rows via API. 
 ```
-	updateRow := []smartsheet.NewCell{
+	updateRow := []NewCell{
 		{ColName: "DueDate", Value: "2020-12-22"},
 		{ColName: "Status", Value: "Pending"},
 	}
 	locked := true  // indicates this row should be locked, use false to unlock
 	sheet.UpdateRow(rowId, updateRow, locked)  // if locked parm omitted, lock status not changed
-	rowLocation := new(smartsheet.RowLocation)
+	rowLocation := new(RowLocation)
 	rowLocation.ToTop = true
 	response, err := sheet.UploadUpdateRows(rowLocation)
 ```
@@ -142,7 +140,7 @@ sheetX.Load(sheetXId, nil)
 var rowCells map[string]string
 for i, row := range sheetX.Rows {
 	fmt.Println("Row Id", row.Id)
-	rowCells = smartsheet.RowValues(sheetX, row)
+	rowCells = RowValues(sheetX, row)
 	fmt.Println(i, rowCells["Customer"], " - ", rowCells["Address"])  // ex. 1 TopButton - 1200 Canton Road
 }
 ```
@@ -150,7 +148,7 @@ for i, row := range sheetX.Rows {
 ### CellInfo Func
 Provides access to additional cell values such as Cell Link, Formula, Hyperlink.
 ```
-	cellData := smartsheet.CellInfo(sheetX, row, "ColumnName")
+	cellData := CellInfo(sheetX, row, "ColumnName")
 	cellData.LinkInFromCell is type CellLink.
 	type CellLink struct {
 		ColumnId int64  `json:"reportId"`
@@ -166,24 +164,35 @@ Provides access to additional cell values such as Cell Link, Formula, Hyperlink.
 type CopyOptions struct {
 	All, Attachments, Children, Discussions bool // specify All or any mix of other options
 }
-options := smartsheet.CopyOptions{All:true}
+options := CopyOptions{All:true}
 rowIds := []int64{877464703340856, 88023437740234870}
-err := smartsheet.CopyRows(fromSheetId, rowIds, toSheetId, &options)
+err := CopyRows(fromSheetId, rowIds, toSheetId, &options)
 
 // move rows, children of parent rows are automatically copied
-err := smartsheet.MoveRows(fromSheetId, rowIds, toSheetId, &options)
+err := MoveRows(fromSheetId, rowIds, toSheetId, &options)
 ```
 
 ### GetRow Func
 Returns a single row via API.
 ```
-row, err := smartsheet.GetRow(sheetId, rowId)
+row, err := GetRow(sheetId, rowId)
+```
+### AddRow, UpdateRow Funcs
+Add or Update 1 row via API.
+```
+// sheetX *SheetInfo
+// newCells []NewCell
+// rowLocation *RowLocation  (nil to use default or no change)
+// locked bool (optional, omit to use default or no change)
+result, err := AddRow(sheetX, newCells, rowLocation, locked)
+result, err := UpdateRow(sheetX, rowId, newCells, rowLocation, locked)
 ```
 
 ### SetParentId Func
 Sets the parent id for child row(s). If a single child row, it will be 1st child of parent, unless optional toBottom is true.
 ```
-err := smartsheet.SetParentId(sheetId, parentId, childIds)
+// childIds []int64
+err := SetParentId(sheetId, parentId, childIds)
 ```
 
 ### Attach File or URL To Row

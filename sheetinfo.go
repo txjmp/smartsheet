@@ -215,8 +215,9 @@ func (she *SheetInfo) UpdateRow(rowId int64, newCells []NewCell, lockRow ...bool
 func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...string) (*AddUpdtRowsResponse, error) {
 	trace("UploadNewRows")
 
-	if location == nil {
-		location = &RowLocation{ToBottom: true}
+	locMap := map[string]interface{}{"toBottom": true}
+	if location != nil {
+		locMap = CreateLocationMap(location) // see util.go
 	}
 	// -- Create Request Body ----------------
 	type reqItem map[string]interface{}
@@ -228,26 +229,8 @@ func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...stri
 		if newRow.Locked != nil { // newRow.Locked is *bool
 			item["locked"] = *newRow.Locked // dereference, returns value referenced by pointer
 		}
-		if location.ToTop {
-			item["toTop"] = true
-		}
-		if location.ToBottom {
-			item["toBottom"] = true
-		}
-		if location.ParentId != 0 {
-			item["parentId"] = location.ParentId
-		}
-		if location.SiblingId != 0 {
-			item["siblingId"] = location.SiblingId
-		}
-		if location.AboveSibling {
-			item["above"] = true
-		}
-		if location.Indent != 0 {
-			item["indent"] = 1
-		}
-		if location.Outdent != 0 {
-			item["outdent"] = 1
+		for k, v := range locMap { // set row location attributes, all rows use same location
+			item[k] = v
 		}
 		reqData = append(reqData, item)
 	}
@@ -335,6 +318,10 @@ func (she *SheetInfo) GetRowLevel(row Row, rowLevelField string) (string, error)
 func (she *SheetInfo) UploadUpdateRows(location *RowLocation) (*AddUpdtRowsResponse, error) {
 	trace("SheetInfo.UploadUpdateRows")
 
+	var locMap map[string]interface{}
+	if location != nil {
+		locMap = CreateLocationMap(location) // see util.go
+	}
 	// -- Create Request Body ----------------
 	type reqItem map[string]interface{}
 	reqData := make([]reqItem, 0, len(she.UpdateRows))
@@ -348,26 +335,8 @@ func (she *SheetInfo) UploadUpdateRows(location *RowLocation) (*AddUpdtRowsRespo
 		if updateRow.Locked != nil { // updateRow.Locked is *bool
 			item["locked"] = *updateRow.Locked // dereference, returns value referenced by pointer
 		}
-		if location.ToTop {
-			item["toTop"] = true
-		}
-		if location.ToBottom {
-			item["toBottom"] = true
-		}
-		if location.ParentId != 0 {
-			item["parentId"] = location.ParentId
-		}
-		if location.SiblingId != 0 {
-			item["siblingId"] = location.SiblingId
-		}
-		if location.AboveSibling {
-			item["above"] = true
-		}
-		if location.Indent != 0 {
-			item["indent"] = 1
-		}
-		if location.Outdent != 0 {
-			item["outdent"] = 1
+		for k, v := range locMap { // set row location attributes, all rows use same location
+			item[k] = v
 		}
 		reqData = append(reqData, item)
 	}

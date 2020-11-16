@@ -76,6 +76,20 @@ func Put(endPoint string, data interface{}, urlParms map[string]string) *http.Re
 	return req
 }
 
+func Delete(endPoint string, urlParms map[string]string) *http.Request {
+	url := basePath + endPoint
+	req, _ := http.NewRequest("DELETE", url, nil)
+	if len(urlParms) > 0 {
+		qryParms := req.URL.Query()
+		for key, val := range urlParms {
+			qryParms.Add(key, val)
+		}
+		req.URL.RawQuery = qryParms.Encode()
+	}
+	debugLn("DELETE - ", req.URL.RequestURI())
+	return req
+}
+
 func DoRequest(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Authorization", Token)
 	client := http.Client{}
