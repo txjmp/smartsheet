@@ -1,5 +1,7 @@
 # Smartsheet Go Mini-SDK
 
+Status as of 11/16/2020 > Testing underway.
+
 Tools for interacting with the Smartsheet API using the Go language. Functionality currently includes a limited set of features.
 
 No 3rd party packages are needed.
