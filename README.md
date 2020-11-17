@@ -4,7 +4,8 @@ Status as of 11/16/2020 > Testing underway.
 
 Tools for interacting with the Smartsheet API using the Go language.
 
-This package is not likely to ever implement all Smartsheet API features. To facilitate adding your own features, see CODEINFO.md. It attempts to explain how the code is organized and patterns used.
+This package is not likely to ever implement all Smartsheet API features. To facilitate adding your own features, see CODEINFO.md. It attempts to explain how the code is organized and patterns used.  
+[CODEINFO](https://github.com/txjmp/smartsheet/blob/main/CODEINFO.md)
 
 No 3rd party packages are needed.
 

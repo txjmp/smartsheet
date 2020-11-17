@@ -19,6 +19,31 @@ For most POST and PUT requests, data is placed into the http request body. The P
 * util.go - CreateLocationMap func
 * webhooks.go - CreateWebHook, EnableWebHook, GetWebHook, DeleteWebHook funcs
 
+## SheetInfo Type
+Contains sheet attributes like id, name, and columns (id,title,type). Columns can accessed by id, name(title), or index(position). Depending on what options were used when loaded, it may also contain, all / some / none of the sheet rows. It also has the following methods:
+* Load(sheetId, GetSheetOptions) - Gets sheet info via api. GetSheetOptions controls what rows are loaded (nil=all rows).
+* MatchSheet(baseSheet) - Compares cols(id,name) of this instance to a base instance. Returns true/false.  
+    Note - the baseSheet instance of SheetInfo would typically be loaded using the Restore(filePath) method.
+* Show(...rowLimit) - Displays id, name, cols(id,name,type), rows (limited to rowLimit)
+* AddRow(newCells, ...locked) - Adds row, using newCells, to .NewRows slice
+* UploadNewRows(rowLocation, rowLevelField) - Uploads .NewRows via API. Use optional rowLevelField for parent/child sets.
+* Store(filePath) - save SheetInfo instance as json encrypted file
+* Restore(filePath) - reload SheetInfo instance from json encrypted file
+
+## NewCell Type
+Used when adding or updating rows. It uses column name rather than column id to identify which column. The AddRow/UpdateRow funcs and SheetInfo.AddRow/UpdateRow methods automatically convert ColName to column id using SheetInfo.ColumnsByName map.
+```
+type NewCell struct {
+	ColName   string
+	Formula   string      // only formula or value can be loaded
+	Value     interface{} // if hyperlink, value is what's displayed in cell
+	Hyperlink *Hyperlink
+}
+```
+
+## RowValues Func
+Makes it easy to reference cell values on a row. It returns returns a map where the key is columnName and cell value is string type. 
+
 ## Example Code - CopyRows Func
 ```
 // CopyRows copies specified rows from 1 sheet to another.
@@ -84,7 +109,8 @@ func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyO
 
 ## Example Code - Update A Row
 Update Status column of a row in the "Tasks" sheet.
-Also change it's location to last child of different parent row and lock it.
+Also change it's location to last child of different parent row and lock it.  
+To update multiple rows using 1 API call. Use SheetInfo.UpdateRow and UploadeUpdateRow methods.
 ```
 var sheetTasks *SheetInfo  // loaded by other code
 
@@ -100,3 +126,8 @@ locked := true
 
 UpdateRow(sheetTasks, rowId, updateCells, &location, locked )
 ```
+
+## A Few Go Notes
+Slices and Maps, if declared but not initialized (using make or initial values), have value = nil.  
+If "len" or "range" are used with nil slice or map, it is treated as having zero entries and works properly.
+Struct and bool types do not have a "zero" value, so pointers may be used, where nil means no value.  

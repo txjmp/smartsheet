@@ -55,7 +55,7 @@ func CreateWebHook(sheet *SheetInfo, name string, columnNames ...string) (int64,
 	req, _ := http.NewRequest("POST", url, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := performRequest(req, false)
+	httpResp, err := DoRequest(req)
 	if err != nil {
 		fmt.Println("xxx CreateWebHook request failed", err)
 	}
@@ -95,7 +95,7 @@ func EnableWebHook(webHookId int64) error {
 	req, _ := http.NewRequest("PUT", url, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := performRequest(req, false)
+	httpResp, err := DoRequest(req)
 	if err != nil {
 		fmt.Println("xxx CreateWebHook, Enable WebHook failed", err)
 	}
@@ -114,7 +114,7 @@ func GetWebHook(webHookId int64) error {
 
 	req, _ := http.NewRequest("GET", url, nil)
 
-	httpResp, err := performRequest(req, false)
+	httpResp, err := DoRequest(req)
 	if err != nil {
 		fmt.Println("xxx GetWebHook failed", err)
 	}
@@ -133,7 +133,7 @@ func DeleteWebHook(webHookId int64) error {
 
 	req, _ := http.NewRequest("DELETE", url, nil)
 
-	httpResp, err := performRequest(req, false)
+	httpResp, err := DoRequest(req)
 	if err != nil {
 		fmt.Println("xxx DeleteWebHook failed", err)
 	}
