@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strconv"
+	"strings"
 )
 
 // GetRow returns specified row from sheet.
@@ -122,7 +124,7 @@ func UpdateRow(sheet *SheetInfo, rowId int64, newCells []NewCell, location *RowL
 	reqData := make(map[string]interface{})
 	reqData["id"] = strconv.FormatInt(rowId, 10) // api expects row id to be a string, don't know why
 	reqData["cells"] = rowCells
-	if len(lockRow) > 0 
+	if len(lockRow) > 0 {
 		reqData["locked"] = lockRow[0]
 	}
 	for k, v := range locMap { // set row location attributes, all rows use same location
@@ -151,12 +153,12 @@ func UpdateRow(sheet *SheetInfo, rowId int64, newCells []NewCell, location *RowL
 // DeleteRows removes specified rowsIds from sheet.
 func DeleteRows(sheetId int64, rowIds ...int64) error {
 
-	ids := make([]string,len(rowIds))
+	ids := make([]string, len(rowIds))
 	for i, id := range rowIds {
 		ids[i] = strconv.FormatInt(id, 10)
 	}
 	urlParms := make(map[string]string)
-	urlParms["ids"] = strings.Join(ids,",")
+	urlParms["ids"] = strings.Join(ids, ",")
 
 	endPoint := fmt.Sprintf("/sheets/%d/rows", sheet.SheetId)
 	req := Delete(endPoint, urlParms)

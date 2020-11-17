@@ -28,25 +28,6 @@ const (
 	LINK   = "LINK"
 )
 
-// RowLocation indicates where a row should be added or moved to.
-type RowLocation struct {
-	ParentId, SiblingId           int64 // 0 indicates no parent or sibling, only one can be used
-	ToTop, ToBottom, AboveSibling bool  // only one should be true, ToBottom is default when adding rows to sheet without parent
-	Indent, Outdent               int   // to activate, load either with value of 1
-}
-
-// GetSheetOptions determines what rows and columns are returned by GetSheet func.
-// If no attributes set, all rows and columns returned.
-type GetSheetOptions struct {
-	RowIds            []int64   // include only specific rows, added to url query parameters
-	RowsModifiedSince time.Time // include only rows modified since specific time
-	RowsModifiedMins  int       // include only rows where modified-time within x minutes before current time
-	ColumnNames       []string  // used by sheetInfo.Load to get columnIds, not used by GetSheet func
-	ColumnIds         []int64   // include only specified columns
-}
-
-var NoRows = &GetSheetOptions{RowIds: []int64{0}} // for convenience, to specify no rows should be returned
-
 // GetSheet downloads specified sheet info based on GetSheetOptions.
 // Typically Load() method of SheetInfo instance is used to call GetSheet.
 // If options is nil, all rows and columns are requested.
@@ -183,12 +164,7 @@ func CellInfo(sheet *SheetInfo, row Row, columnName string) *Cell {
 	return response
 }
 
-// CopyOptions is used by CopyRows to indicate what elements (in addition to cells) are copied to the destination sheet.
-type CopyOptions struct {
-	All, Attachments, Children, Discussions bool // specify All or any mix of other options
-}
-
-// CopyRows copies specified rows from 1 sheet to another.
+// CopyRows copies specified rows from 1 sheet to bottom of another (RowLocation not supported).
 // Optional CopyOptions indicates what elements, attached to each row, are included.
 // If CopyOptions is nil, only the row cells are copied.
 func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyOptions) error {
@@ -233,11 +209,6 @@ func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyO
 	}
 	resp.Body.Close()
 	return nil
-}
-
-// MoveOptions is used by MoveRows to indicate what elements (in addition to cells) are copied to the destination sheet.
-type MoveOptions struct {
-	Attachments, Discussions bool // Child rows are always moved
 }
 
 // MoveRows moves specified rows from 1 sheet to another.

@@ -3,28 +3,21 @@
 The purpose of this document is to describe the organization and techniques used to implement functionality.
 
 ## URL Parameters
-Sometimes the API wants values passed as query parameters in the URL. The Get, Post, Put, Delete funcs in request.go handle this process. They accept a map[string]string parameter containing the key:value combinations. If a key has multiple values, all values must be joined together, separated by commas. FYI, Go's URL.Values type has an Add method that allows different values to be added to the same key. Unfortunately the Values.Encode method creates a separate key=value(for each value) in the url query string (which Smartsheet does not like).
+Sometimes the API wants values passed as query parameters in the URL. The Get, Post, Put, Delete funcs in request.go handle this process. They accept a map[string]string parameter containing the key:value combinations. If a key has multiple values, all values must be joined together, separated by commas. FYI, Go's URL.Values type has an Add method that allows multiple values to be added to the same key. Unfortunately the Values.Encode method creates a separate key=value(for each value) in the url query string (which Smartsheet does not like).
 
 ## Request Data
-For most POST and PUT requests, data is placed into the http request body. The Post, Put funcs in request.go handle this process. The calling func passes the data in whatever format the API requires. For example, the following is used to Copy Rows:
-```
-var reqData struct {
-	RowIds  []int64 `json:"rowIds"`
-	To      struct {
-		SheetId int64 `json:"sheetId"`
-	} `json:"to"`
-}
-reqData.RowIds = rowIds
-reqData.To.SheetId = toSheetId
-```    
+For most POST and PUT requests, data is placed into the http request body. The Post, Put funcs in request.go handle this process. The calling func passes the data in whatever format the API requires. For an example, see the Example Code - CopyRows func section below.
 
-## Typical Process Steps
-1. Set call options if needed (ex. RowLocation, GetSheetOptions, CopyOptions)
-2. Create URL parameter map if needed (ex. CopyRow options)
-3. Build request data if needed (for most Post & Put calls)
-4. Set the URL end point for the API call.
-5. Call http request builder (Get, Post, Put, Delete)
-6. Execute the call
+## Go Files
+
+* apitypes.go - primary api types: column, cell, row, sheet, etc.
+* options.go - types CopyOptions, MoveOptions, GetSheetOptions, RowLocation
+* request.go - Get, Post, Put, Delete, DoRequest funcs
+* row.go - GetRow, AddRow, UpdateRow, DeleteRows funcs
+* sheetinfo.go - SheetInfo type and methods
+* smartsheet.go - GetSheet, RowValues, CellInfo, CopyRows, MoveRows, SetParentId, AttachFile,UrlToRow, GetSheetRows funcs
+* util.go - CreateLocationMap func
+* webhooks.go - CreateWebHook, EnableWebHook, GetWebHook, DeleteWebHook funcs
 
 ## Example Code - CopyRows Func
 ```
@@ -45,7 +38,7 @@ func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyO
 	// -------------------------------------------
     // build url parameter map using CopyOptions
     // -------------------------------------------
-	var urlParms map[string]string
+	var urlParms map[string]string  // urlParms has value of nil
 	if options != nil {
 		ops := make([]string, 0, 3)
 		if options.All {
@@ -89,37 +82,21 @@ func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyO
 }
 ```
 
-## Example
+## Example Code - Update A Row
 Update Status column of a row in the "Tasks" sheet.
-Also change it's location (last child of different parent row), and lock it.
+Also change it's location to last child of different parent row and lock it.
 ```
 var sheetTasks *SheetInfo  // loaded by other code
 
 location := RowLocation{ ParentId:parentRowId, ToBottom:true }  // parentRowId is int64 var
 
-updateCells := make([]Cell,1)  // this example is updating 1 cell in the row
+updateCells := make([]NewCell,1)  // this example is updating 1 cell in the row
 
 updateCells[0] := NewCell{     // create update cell
     ColName: "Status",
     Value:   "Hold",
 }
 locked := true
+
 UpdateRow(sheetTasks, rowId, updateCells, &location, locked )
-//  constructs request body using sheetInfo, rowId, updateCells, location
-
 ```
-## Organization
-
-### SheetInfo
-SheetInfo is the predominant type for performing tasks.
-It contains attributes such as sheetId, sheetName, and column info.
-It also contains data (rows).
-```
-vendorSheet := new(SheetInfo)  // create new instance
-vendorSheet.Load(vendorSheetId, options)  // using the API, sheet info is downloaded
-vendorSheet.Rows now contains the row data.
-```
-Th
-
-
-There are independent functions such as GetRow and methods of the SheetInfo type
