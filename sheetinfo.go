@@ -9,15 +9,6 @@ import (
 	"strconv"
 )
 
-// NewCell is used when adding or updating rows.
-// See SheetInfo AddRow() and UpdateRow() methods.
-type NewCell struct {
-	ColName   string
-	Formula   string      // only formula or value can be loaded
-	Value     interface{} // if hyperlink, value is what's displayed in cell
-	Hyperlink *Hyperlink
-}
-
 // SheetInfo contains information about a sheet and methods for interacting with it.
 // See Load() method for details on what is loaded.
 type SheetInfo struct {
@@ -34,17 +25,21 @@ type SheetInfo struct {
 }
 
 // Load method downloads sheet info by calling GetSheet func and pulling data from the returned sheet info.
-// Optional GetSheetOptions is defined in smartsheet.go.
+// Optional GetSheetOptions is defined in options.go.
 // If only specific columns are needed, options.ColumnNames are converted to ColumnIds
 func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) error {
 
-	if options == nil {
-		options = new(GetSheetOptions)
-	}
-	options.ColumnIds = make([]int64, len(options.ColumnNames))
-	for i, colName := range options.ColumnNames {
-		column := she.ColumnsByName[colName]
-		options.ColumnIds[i] = column.Id
+	// if specified, convert columnNames to columnIds
+	if options != nil && len(options.ColumnNames) > 0 {
+		options.ColumnIds = make([]int64, len(options.ColumnNames))
+		for i, colName := range options.ColumnNames {
+			column, found := she.ColumnsByName[colName]
+			if !found {
+				log.Println("SheetInfo.Load Invalid ColName in options", colName)
+				return errors.New("Invalid ColName - " + colName)
+			}
+			options.ColumnIds[i] = column.Id
+		}
 	}
 	sheet, err := GetSheet(sheetId, options)
 	if err != nil {
@@ -135,31 +130,20 @@ func (she *SheetInfo) Show(rowLimit ...int) {
 }
 
 // AddRow adds a row to SheetInfo.NewRows.
-// A row consists of slice of NewCell objects and optional lockRow indicator.
-// Do not include lockRow unless new row is to be locked.
+// A row consists of slice of Cell objects and optional locked indicator.
+// Do not set lockRow unless new row is to be locked.
 // All added rows are processed in a batch using UploadNewRows() method.
-func (she *SheetInfo) AddRow(newCells []NewCell, lockRow ...bool) error {
-
-	var locked *bool                    // if lockRow not specified, locked is nil (not false)
-	if len(lockRow) > 0 && lockRow[0] { // false not used for new rows
-		locked = &isTrue
-	}
-	newRow := Row{
-		Cells:  make([]Cell, len(newCells)),
-		Locked: locked, // if nil, will be omitted from api call
-	}
-	for i, newCell := range newCells {
-		column, found := she.ColumnsByName[newCell.ColName]
+func (she *SheetInfo) AddRow(newRow Row) error {
+	trace("SheetInfo.AddRow")
+	// load Cell.ColumnId using Cell.ColName
+	for i := 0; i < len(newRow.Cells); i++ {
+		colName := newRow.Cells[i].ColName
+		column, found := she.ColumnsByName[colName]
 		if !found {
-			log.Println("ERROR - SheetInfo.AddRow column not found", she.SheetName, newCell.ColName)
-			return errors.New("Invalid ColumnName - " + newCell.ColName)
+			log.Println("ERROR - SheetInfo.AddRow column not found", she.SheetName, colName)
+			return errors.New("Invalid ColumnName - " + colName)
 		}
-		newRow.Cells[i] = Cell{
-			ColumnId:  column.Id,
-			Formula:   newCell.Formula,   // only Formula or Value can be loaded, "" will be omitted
-			Value:     newCell.Value,     // only Formula or Value can be loaded, nil will be omitted
-			Hyperlink: newCell.Hyperlink, // nil will be omitted
-		}
+		newRow.Cells[i].ColumnId = column.Id
 	}
 	if she.NewRows == nil { // set to nil by UploadNewRows
 		she.NewRows = make([]Row, 0, 100)
@@ -169,41 +153,25 @@ func (she *SheetInfo) AddRow(newCells []NewCell, lockRow ...bool) error {
 }
 
 // UpdateRow adds a row to SheetInfo.UpdateRows.
-// A row consists of rowId, slice of NewCell objects, and optional lockRow indicator.
-// Only include lockRow if row is to be locked(true) or unlocked(false).
+// A row consists of rowId, slice of Cell objects, and locked indicator.
+// Leave locked field as nil, unless lock status is to be changed.
 // All updated rows are processed in a batch using UploadUpdateRows() method.
-func (she *SheetInfo) UpdateRow(rowId int64, newCells []NewCell, lockRow ...bool) error {
-
-	var locked *bool // if lockRow not specified, locked is nil (not false)
-	if len(lockRow) > 0 {
-		if lockRow[0] {
-			locked = &isTrue
-		} else {
-			locked = &isFalse
-		}
-	}
-	newRow := Row{
-		Id:     rowId,
-		Cells:  make([]Cell, len(newCells)),
-		Locked: locked, // if nil, will be omitted from api call
-	}
-	for i, newCell := range newCells {
-		column, found := she.ColumnsByName[newCell.ColName]
+func (she *SheetInfo) UpdateRow(updtRow Row) error {
+	trace("SheetInfo.UpdateRow")
+	// load Cell.ColumnId using Cell.colName
+	for i := 0; i < len(updtRow.Cells); i++ {
+		colName := updtRow.Cells[i].ColName
+		column, found := she.ColumnsByName[colName]
 		if !found {
-			log.Println("ERROR - SheetInfo.UpdateRow column not found", she.SheetName, newCell.ColName)
-			return errors.New("Invalid ColumnName - " + newCell.ColName)
+			log.Println("ERROR - SheetInfo.UpdateRow column not found", she.SheetName, colName)
+			return errors.New("Invalid ColumnName - " + colName)
 		}
-		newRow.Cells[i] = Cell{
-			ColumnId:  column.Id,
-			Formula:   newCell.Formula,   // only Formula or Value can be loaded, "" will be omitted
-			Value:     newCell.Value,     // only Formula or Value can be loaded, nil will be omitted
-			Hyperlink: newCell.Hyperlink, // nil will be omitted
-		}
+		updtRow.Cells[i].ColumnId = column.Id
 	}
 	if she.UpdateRows == nil { // set to nil by UploadUpdateRows
 		she.UpdateRows = make([]Row, 0, 100)
 	}
-	she.UpdateRows = append(she.UpdateRows, newRow)
+	she.UpdateRows = append(she.UpdateRows, updtRow)
 	return nil
 }
 

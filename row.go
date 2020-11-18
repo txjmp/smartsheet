@@ -45,22 +45,17 @@ func GetRow(sheetId, rowId int64) (*Row, error) {
 // AddRow adds 1 row to specified sheet.
 // If location is nil, row added to bottom of sheet.
 // SheetInfo is used to convert columnNames to columnIds and must contain SheetId.
-func AddRow(sheet *SheetInfo, newCells []NewCell, location *RowLocation, lockRow ...bool) (*AddUpdtRowsResponse, error) {
+func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowsResponse, error) {
 	trace("AddRow")
-
-	rowCells := make([]Cell, len(newCells))
-	for i, newCell := range newCells {
-		column, found := sheet.ColumnsByName[newCell.ColName]
+	// load Cell.ColumnId using Cell.colName
+	for i := 0; i < len(newRow.Cells); i++ {
+		colName := newRow.Cells[i].ColName
+		column, found := sheet.ColumnsByName[colName]
 		if !found {
-			log.Println("ERROR - AddRow column not found", sheet.SheetName, newCell.ColName)
-			return nil, errors.New("Invalid ColumnName - " + newCell.ColName)
+			log.Println("ERROR - SheetInfo.AddRow column not found", sheet.SheetName, colName)
+			return nil, errors.New("Invalid ColumnName - " + colName)
 		}
-		rowCells[i] = Cell{
-			ColumnId:  column.Id,
-			Formula:   newCell.Formula,   // only Formula or Value can be loaded, "" will be omitted
-			Value:     newCell.Value,     // only Formula or Value can be loaded, nil will be omitted
-			Hyperlink: newCell.Hyperlink, // nil will be omitted
-		}
+		newRow.Cells[i].ColumnId = column.Id
 	}
 	locMap := map[string]interface{}{"toBottom": true}
 	if location != nil {
@@ -68,9 +63,9 @@ func AddRow(sheet *SheetInfo, newCells []NewCell, location *RowLocation, lockRow
 	}
 	// -- Create Request Body ----------------
 	reqData := make(map[string]interface{})
-	reqData["cells"] = rowCells
-	if len(lockRow) > 0 && lockRow[0] { // false not used for new rows
-		reqData["locked"] = true
+	reqData["cells"] = newRow.Cells
+	if newRow.Locked != nil { // newRow.Locked is *bool
+		reqData["locked"] = *newRow.Locked // dereference, returns value referenced by pointer
 	}
 	for k, v := range locMap { // set row location attributes, all rows use same location
 		reqData[k] = v
@@ -99,37 +94,33 @@ func AddRow(sheet *SheetInfo, newCells []NewCell, location *RowLocation, lockRow
 // If location is nil, row location is not changed.
 // SheetInfo is used to convert columnNames to columnIds and must contain SheetId.
 // Omit lockRow parm to leave lock status unchanged.
-func UpdateRow(sheet *SheetInfo, rowId int64, newCells []NewCell, location *RowLocation, lockRow ...bool) (*AddUpdtRowsResponse, error) {
+func UpdateRow(sheet *SheetInfo, updtRow Row, location *RowLocation) (*AddUpdtRowsResponse, error) {
 	trace("UpdateRow")
-
-	rowCells := make([]Cell, len(newCells))
-	for i, newCell := range newCells {
-		column, found := sheet.ColumnsByName[newCell.ColName]
+	// load Cell.ColumnId using Cell.colName
+	for i := 0; i < len(updtRow.Cells); i++ {
+		colName := updtRow.Cells[i].ColName
+		column, found := sheet.ColumnsByName[colName]
 		if !found {
-			log.Println("ERROR - UpdateRow column not found", sheet.SheetName, newCell.ColName)
-			return nil, errors.New("Invalid ColumnName - " + newCell.ColName)
+			log.Println("ERROR - SheetInfo.AddRow column not found", sheet.SheetName, colName)
+			return nil, errors.New("Invalid ColumnName - " + colName)
 		}
-		rowCells[i] = Cell{
-			ColumnId:  column.Id,
-			Formula:   newCell.Formula,   // only Formula or Value can be loaded, "" will be omitted
-			Value:     newCell.Value,     // only Formula or Value can be loaded, nil will be omitted
-			Hyperlink: newCell.Hyperlink, // nil will be omitted
-		}
+		updtRow.Cells[i].ColumnId = column.Id
 	}
-	var locMap map[string]interface{}
+	locMap := map[string]interface{}{"toBottom": true}
 	if location != nil {
 		locMap = CreateLocationMap(location) // see util.go
 	}
 	// -- Create Request Body ----------------
 	reqData := make(map[string]interface{})
-	reqData["id"] = strconv.FormatInt(rowId, 10) // api expects row id to be a string, don't know why
-	reqData["cells"] = rowCells
-	if len(lockRow) > 0 {
-		reqData["locked"] = lockRow[0]
+	reqData["id"] = strconv.FormatInt(updtRow.Id, 10) // api expects row id to be a string, don't know why
+	reqData["cells"] = updtRow.Cells
+	if updtRow.Locked != nil { // newRow.Locked is *bool
+		reqData["locked"] = *updtRow.Locked // dereference, returns value referenced by pointer
 	}
 	for k, v := range locMap { // set row location attributes, all rows use same location
 		reqData[k] = v
 	}
+
 	endPoint := fmt.Sprintf("/sheets/%d/rows", sheet.SheetId)
 	req := Put(endPoint, reqData, nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -160,7 +151,7 @@ func DeleteRows(sheetId int64, rowIds ...int64) error {
 	urlParms := make(map[string]string)
 	urlParms["ids"] = strings.Join(ids, ",")
 
-	endPoint := fmt.Sprintf("/sheets/%d/rows", sheet.SheetId)
+	endPoint := fmt.Sprintf("/sheets/%d/rows", sheetId)
 	req := Delete(endPoint, urlParms)
 
 	resp, err := DoRequest(req)

@@ -18,17 +18,6 @@ type CellLink struct {
 	Status   string `json:"status"`
 }
 
-// Cell is used in both api responses and api requests.
-// It is also used when adding and updating rows. See SheetInfo.AddRow, UpdateRow.
-type Cell struct {
-	ColumnId        int64       `json:"columnId"`
-	Formula         string      `json:"formula,omitempty"`
-	Hyperlink       *Hyperlink  `json:"hyperlink,omitempty"`
-	LinkInFromCell  *CellLink   `json:"linkInFromCell,omitempty"`
-	LinksOutToCells []CellLink  `json:"linksOutToCells,omitempty"`
-	Value           interface{} `json:"value,omitempty"`
-}
-
 type Column struct {
 	Id      int64    `json:"id"`
 	Index   int      `json:"index"`
@@ -38,8 +27,21 @@ type Column struct {
 	Options []string `json:"options"`
 }
 
+// Cell is used in both api responses and api requests.
+// It is also used when adding and updating rows. See SheetInfo.AddRow, UpdateRow.
+type Cell struct {
+	ColName         string      `json:"-"` // not used by API
+	ColumnId        int64       `json:"columnId"`
+	Formula         string      `json:"formula,omitempty"`
+	Hyperlink       *Hyperlink  `json:"hyperlink,omitempty"`
+	LinkInFromCell  *CellLink   `json:"linkInFromCell,omitempty"`
+	LinksOutToCells []CellLink  `json:"linksOutToCells,omitempty"`
+	Value           interface{} `json:"value,omitempty"`
+}
+
 // Row is used in api responses but not api requests.
 // It is also used when adding and updating rows. See SheetInfo.NewRows, UpdateRows.
+// For row add/update requests, a dynamic object is created using map[string]interface{} (includes row location fields).
 type Row struct {
 	Id     int64  `json:"id"`
 	Cells  []Cell `json:"cells"`

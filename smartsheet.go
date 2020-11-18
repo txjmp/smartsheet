@@ -16,8 +16,8 @@ import (
 var DebugOn bool = false // calling package can turn these on/off as needed
 var TraceOn bool = false
 
-var isTrue bool = true // address of this var is used when setting boolean pointer values
-var isFalse bool = false
+var IsTrue bool = true // address of this var is used when setting boolean pointer values
+var IsFalse bool = false
 
 const (
 	EGNYTE      = "EGNYTE"
@@ -274,7 +274,7 @@ func SetParentId(sheet *SheetInfo, parentId int64, childIds []int64, toBottom ..
 		reqData[i] = reqItem{Id: childId, ParentId: parentId}
 	}
 	if len(toBottom) > 0 && len(childIds) == 1 && toBottom[0] {
-		reqData[0].ToBottom = &isTrue
+		reqData[0].ToBottom = &IsTrue
 	}
 	endPoint := fmt.Sprintf("/sheets/%d/rows", sheet.SheetId)
 	req := Put(endPoint, reqData, nil)
