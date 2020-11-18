@@ -59,7 +59,7 @@ func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyO
 		} `json:"to"`
 	}
 	reqData.RowIds = rowIds
-	reqData.To.SheetId = toSheetId
+	reqData.To.SheetId = toSheetId  
 	// -------------------------------------------
     // build url parameter map using CopyOptions
     // -------------------------------------------
@@ -84,18 +84,18 @@ func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyO
 			urlParms["include"] = strings.Join(ops, ",")
 		}
 	}
-	// -------------------------------------------
+	// -------------------------------------------  
     // create url end point
     // -------------------------------------------
 	endPoint := fmt.Sprintf("/sheets/%d/rows/copy", fromSheetId)
 
-	// -------------------------------------------
+	// -------------------------------------------  
     // call request builder
     // -------------------------------------------
 	req := Post(endPoint, reqData, urlParms)
 	req.Header.Set("Content-Type", "application/json")
 
-	// -------------------------------------------
+	// -------------------------------------------  
     // execute request
     // -------------------------------------------
 	resp, err := DoRequest(req)
