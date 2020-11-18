@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 var DebugOn bool = false // calling package can turn these on/off as needed
@@ -21,11 +19,14 @@ var TraceOn bool = false
 var isTrue bool = true // address of this var is used when setting boolean pointer values
 var isFalse bool = false
 
-type m bson.M
-
 const (
-	EGNYTE = "EGNYTE"
-	LINK   = "LINK"
+	EGNYTE      = "EGNYTE"
+	LINK        = "LINK"
+	BOX         = "BOX_COM"
+	DROPBOX     = "DROPBOX"
+	EVERNOTE    = "EVERNOTE"
+	GOOGLEDRIVE = "GOOGLE_DRIVE"
+	ONEDRIVE    = "ONEDRIVE"
 )
 
 // GetSheet downloads specified sheet info based on GetSheetOptions.
