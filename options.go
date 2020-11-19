@@ -1,5 +1,7 @@
 package smartsheet
 
+import "time"
+
 // RowLocation indicates where a row should be added or moved to.
 type RowLocation struct {
 	ParentId, SiblingId           int64 // 0 indicates no parent or sibling, only one can be used
