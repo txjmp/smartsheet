@@ -223,7 +223,7 @@ type Column struct {
 	Options []string `json:"options"`
 }
 type Cell struct {
-	ColName   		string		`json:"-"`   // not used by API
+	ColName         string      `json:"-"`   // not used by API
 	ColumnId        int64       `json:"columnId"`
 	Formula         string      `json:"formula,omitempty"`
 	Hyperlink       *Hyperlink  `json:"hyperlink,omitempty"`
@@ -235,12 +235,6 @@ type Row struct {
 	Id     int64  `json:"id"`
 	Cells  []Cell `json:"cells"`
 	Locked *bool  `json:"locked"` // when updating rows: nil-nochange, false-unlock, true-lock
-}
-type NewCell struct {
-	ColumnName string
-	Formula    string      // only formula or value can be loaded
-	Value      interface{} // if hyperlink, value is what's displayed in cell
-	Hyperlink  *Hyperlink
 }
 type Hyperlink struct {
 	Reportid int64  `json:"reportId"`
