@@ -13,13 +13,9 @@ The SheetInfo type contains most of the information about a sheet including defi
 
 GoDoc documentation will provide complete type and func details. This document is intended to explain functionality in a more concise and easy to understand format.
 
-**To use this package, the following file must be added to the smartsheet pkg folder**.  
-* file name: token.go
-* file contents:  
-```
-package smartsheet
-
-var Token = "Bearer youraccesstokengoeshere"
+**To use this package, global var Token must be set with your access token**.
+```  
+Token = "Bearer youraccesstoken"
 ```
 
 ## Examples
