@@ -1,6 +1,6 @@
 # Smartsheet Go Mini-SDK
 
-Status as of 11/16/2020 > Testing underway.
+Status as of 11/18/2020 > Active refactoring and testing. Not stable, but mostly working.
 
 Tools for interacting with the Smartsheet API using the Go language.
 
@@ -12,6 +12,15 @@ No 3rd party packages are needed.
 The SheetInfo type contains most of the information about a sheet including definitions (column ids/names/types) and data (rows). It also has methods for interacting with a sheet.
 
 GoDoc documentation will provide complete type and func details. This document is intended to explain functionality in a more concise and easy to understand format.
+
+**To use this package, the following file must be added to the smartsheet pkg folder**.  
+* file name: token.go
+* file contents:  
+```
+package smartsheet
+
+var Token = "Bearer youraccesstokengoeshere"
+```
 
 ## Examples
 
@@ -59,15 +68,10 @@ if options is nil, all rows and columns returned.
 New rows are first added to SheetInfo.NewRows slice using AddRow method.
 UploadNewRows adds NewRows to the sheet via API.
 ```
-type NewCell struct {
-	ColumnName string
-	Formula    string      // only formula or value can be loaded
-	Value      interface{} // if hyperlink, value is what's displayed in cell
-	Hyperlink  *Hyperlink
-}
-
+var newRow Row
 // -- Add Parent Row -----------------------------------------
-newRow := []NewCell{
+newRow = InitRow()
+newRow.Cells = []Cell{
 	{ColName: "Step", Value: "Start" },
 	{ColName: "Level", Value: "0"},  // parent indicator
 }
@@ -75,7 +79,8 @@ err = sheet.AddRow(newRow)
 
 // -- Add Child Row -----------------------------------------
 linkedDoc := &Hyperlink{Url:"https://..."}  // linkedDoc is pointer
-newRow := []NewCell{
+newRow = InitRow()
+newRow.Cells = []Cell{
 	{ColName: "Step", Value: "Start" },
 	{ColName: "Level", Value: "1"},  // child indicator
 	{ColName: "Phase", Value: "Design"},
@@ -117,60 +122,47 @@ type RowLocation struct {
 	Indent 		int
 	Outdent 	int
 }
-
-rowLocation := RowLocation{ToTop:true}
-sheetX.UploadNewRows( &rowLocation )
-
 ```
 ### Update Rows
 Updated rows are first added to SheetInfo.UpdateRows slice using UpdateRow method.
 UploadUpdateRows updates sheet rows via API. 
 ```
-	updateRow := []NewCell{
-		{ColName: "DueDate", Value: "2020-12-22"},
-		{ColName: "Status", Value: "Pending"},
-	}
-	locked := true  // indicates this row should be locked, use false to unlock
-	sheet.UpdateRow(rowId, updateRow, locked)  // if locked parm omitted, lock status not changed
-	rowLocation := new(RowLocation)
-	rowLocation.ToTop = true
-	response, err := sheet.UploadUpdateRows(rowLocation)
+updtRow := InitRow(rowId)  // updtRow.Id will be loaded with rowId
+updtRow.Locked = &IsTrue   // Locked is pointer type (allows use of nil to indicate no value)
+updtRow.Cells = []Cell{
+	{ColName: "DueDate", Value: "2020-12-22"},
+	{ColName: "Status", Value: "Pending"},
+}
+sheet.UpdateRow(updtRow)
+location := RowLocation{ToTop:true}
+response, err := sheet.UploadUpdateRows(&location)
 ```
 
 ### Referencing Row Values
-Row type contains RowId, []Cell, Locked indicator.
 Func RowValues returns the cell values of a row as a map[string]string. Key of each map entry is column name. Value of each map entry is a string representation of the value. Numbers do not contain formatting such as $ and commas. Hyperlink values return the url. Multi value cells return all values concatenated together. To access all cell information such as cell link values, use CellInfo func.
 ```
-sheetX.Load(sheetXId, nil)
-var rowCells map[string]string
+sheetX.Load(sheetXId, nil)  // loads all rows
 for i, row := range sheetX.Rows {
 	fmt.Println("Row Id", row.Id)
-	rowCells = RowValues(sheetX, row)
+	rowCells := RowValues(sheetX, row)   // rowCells is type map[string]string
 	fmt.Println(i, rowCells["Customer"], " - ", rowCells["Address"])  // ex. 1 TopButton - 1200 Canton Road
 }
 ```
 
 ### CellInfo Func
-Provides access to additional cell values such as Cell Link, Formula, Hyperlink.
+Convenient way to reference a particular cell. Provides access to all cell attributes.
 ```
-	cellData := CellInfo(sheetX, row, "ColumnName")
-	cellData.LinkInFromCell is type CellLink.
-	type CellLink struct {
-		ColumnId int64  `json:"reportId"`
-		RowId    int64  `json:"rowId"`
-		SheetId  int64  `json:"sheetId"`
-		Status   string `json:"status"`
-	}
+cell := CellInfo(sheetX, row, "ColumnName")  // cell is type Cell
 ```
 
 ### Copy & Move Rows
+CopyOptions is used by CopyRows to indicate what elements (in addition to cells) are copied to the destination sheet. If nil, none are copied.
 ```
-// CopyOptions is used by CopyRows to indicate what elements (in addition to cells) are copied to the destination sheet. If nil, none are copied.
 type CopyOptions struct {
 	All, Attachments, Children, Discussions bool // specify All or any mix of other options
 }
 options := CopyOptions{All:true}
-rowIds := []int64{877464703340856, 88023437740234870}
+rowIds := []int64{rowId1, rowId2}
 err := CopyRows(fromSheetId, rowIds, toSheetId, &options)
 
 // move rows, children of parent rows are automatically copied
@@ -183,27 +175,22 @@ Returns a single row via API.
 row, err := GetRow(sheetId, rowId)
 ```
 ### AddRow, UpdateRow Funcs
-Add or Update 1 row via API.
+Add or Update 1 row via API. See AddRow, UpdateRow SheetInfo discussion above for details.
 ```
-// sheetX *SheetInfo
-// newCells []NewCell
-// rowLocation *RowLocation  (nil to use default or no change)
-// locked bool (optional, omit to use default or no change)
-result, err := AddRow(sheetX, newCells, rowLocation, locked)
-result, err := UpdateRow(sheetX, rowId, newCells, rowLocation, locked)
+result, err := AddRow(sheetX, newRow, &location)
+result, err := UpdateRow(sheetX, updtRow, &location)
 ```
 
 ### SetParentId Func
 Sets the parent id for child row(s). If a single child row, it will be 1st child of parent, unless optional toBottom is true.
 ```
-// childIds []int64
-err := SetParentId(sheetId, parentId, childIds)
+err := SetParentId(sheetId, parentId, childIds)  // childIds []int64
 ```
 
 ### Attach File or URL To Row
 ```
 err := AttachFileToRow(sheetId, rowId, filePath)
-err := AttachUrlToRow(sheetId, rowId, fileName, attachmentType, linkUrl)
+err := AttachUrlToRow(sheetId, rowId, attachmentName, attachmentType, linkUrl)
 ```
 
 ### Other Features
@@ -236,6 +223,7 @@ type Column struct {
 	Options []string `json:"options"`
 }
 type Cell struct {
+	ColName   		string		`json:"-"`   // not used by API
 	ColumnId        int64       `json:"columnId"`
 	Formula         string      `json:"formula,omitempty"`
 	Hyperlink       *Hyperlink  `json:"hyperlink,omitempty"`
