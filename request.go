@@ -12,6 +12,8 @@ import (
 
 const basePath = "https://api.smartsheet.com/2.0"
 
+var Token string
+
 var RequestDelay time.Duration = 1 * time.Second // delay between API requests, maximum of 100 requests per minute
 
 func Get(endPoint string, urlParms map[string]string) *http.Request {

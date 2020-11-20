@@ -1,5 +1,14 @@
 package smartsheet
 
+func InitRow(rowId ...int64) Row {
+	var newRow Row
+	if len(rowId) > 0 {
+		newRow.Id = rowId[0]
+	}
+	newRow.Cells = make([]Cell, 0, 50)
+	return newRow
+}
+
 // CreateLocationMap accepts struct type RowLocation and returns a map.
 func CreateLocationMap(location *RowLocation) map[string]interface{} {
 

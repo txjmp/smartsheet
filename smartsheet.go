@@ -20,6 +20,9 @@ var IsTrue bool = true // address of this var is used when setting boolean point
 var IsFalse bool = false
 
 const (
+	DateFormat = "2006-01-02"
+)
+const (
 	EGNYTE      = "EGNYTE"
 	LINK        = "LINK"
 	BOX         = "BOX_COM"
@@ -339,7 +342,7 @@ func AttachFileToRow(sheetId, rowId int64, filePath string) error {
 }
 
 // AttachUrlToRow attaches url link to a row.
-func AttachUrlToRow(sheetId, rowId int64, fileName, attachmentType, linkUrl string) error {
+func AttachUrlToRow(sheetId, rowId int64, attachmentName, attachmentType, linkUrl string) error {
 	trace("AttachUrlToRow")
 
 	//'{"name":"Search Engine", "description": "A popular search engine", "attachmentType":"LINK", "url":"http://www.google.com"}'
@@ -349,7 +352,7 @@ func AttachUrlToRow(sheetId, rowId int64, fileName, attachmentType, linkUrl stri
 		AttachmentType string `json:"attachmentType"` // LINK, BOX_COM, DROPBOX, EGNYTE, EVERNOTE, GOOGLE_DRIVE, ONEDRIVE
 		Url            string `json:"url"`
 	}
-	reqData.Name = fileName
+	reqData.Name = attachmentName
 	reqData.AttachmentType = attachmentType
 	reqData.Url = linkUrl
 
