@@ -27,15 +27,12 @@ func Test_SheetInfo(t *testing.T) {
 	var err error
 	setToken()
 
-	//she := new(SheetInfo)
-	//she.Load(Test2Id, nil)
-	//she.Show()
-
 	//TraceOn = true
 	//DebugOn = true
-	//if err = series1(); err != nil {
-	//	t.Error("series1 Failed", err)
-	//}
+
+	if err = series1(); err != nil {
+		t.Error("series1 Failed", err)
+	}
 	if err = series2(); err != nil {
 		t.Error("series2 Failed", err)
 	}
@@ -125,25 +122,33 @@ func series2() error {
 		fmt.Println("rows loaded", len(response.Result))
 		return errors.New("Wrong Number of Rows Added")
 	}
-	sheet.Load(sheetId, nil)
-	sheet.Show()
 
 	// === UPDATE ROWS ==================================================================
+
+	sheet.Load(sheetId, nil)
 
 	// If DueDate column value is before today, set Status to red
 	today := time.Now().Format(DateFormat) // "yyyy-mm-dd"
 	for _, row := range sheet.Rows {
-		rec := RowValues(sheet, row)
-		if rec["Level"] == "1" { // child row
-			if rec["DueDate"] < today {
+		vals := RowValues(sheet, row)
+		if vals["Level"] == "1" { // child row
+			if vals["DueDate"] < today {
 				updtRow := InitRow(row.Id)
 				updtRow.Cells = []Cell{
 					{ColName: "Status", Value: "Red"},
 				}
+				// or
+				//updtRow.Cells = append(updtRow.Cells, Cell{ColName: "Status", Value::"Red"})
 				sheet.UpdateRow(updtRow)
 			}
 		}
 	}
 	_, err = sheet.UploadUpdateRows(nil)
+
+	// === SHOW ROWS ==================================================================
+
+	sheet.Load(sheetId, nil)
+	sheet.Show()
+
 	return err
 }
