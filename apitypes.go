@@ -78,3 +78,10 @@ type AddUpdtRowsResponse struct {
 	ResultCode int    `json:"resultCode"` // ex. 0
 	Result     []Row  `json:"result"`
 }
+
+// Response object for Adding or Updating 1 Row
+type AddUpdtRowResponse struct {
+	Message    string `json:"message"`    // ex. "SUCCESS"
+	ResultCode int    `json:"resultCode"` // ex. 0
+	Result     Row    `json:"result"`
+}
