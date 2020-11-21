@@ -25,24 +25,10 @@ Contains sheet attributes like id, name, and columns (id,title,type). Columns ca
 * MatchSheet(baseSheet) - Compares cols(id,name) of this instance to a base instance. Returns true/false.  
     Note - the baseSheet instance of SheetInfo would typically be loaded using the Restore(filePath) method.
 * Show(...rowLimit) - Displays id, name, cols(id,name,type), rows (limited to rowLimit)
-* AddRow(newCells, ...locked) - Adds row, using newCells, to .NewRows slice
+* AddRow(newRow) - Adds row to .NewRows slice
 * UploadNewRows(rowLocation, rowLevelField) - Uploads .NewRows via API. Use optional rowLevelField for parent/child sets.
 * Store(filePath) - save SheetInfo instance as json encrypted file
 * Restore(filePath) - reload SheetInfo instance from json encrypted file
-
-## NewCell Type
-Used when adding or updating rows. It uses column name rather than column id to identify which column. The AddRow/UpdateRow funcs and SheetInfo.AddRow/UpdateRow methods automatically convert ColName to column id using SheetInfo.ColumnsByName map.
-```
-type NewCell struct {
-	ColName   string
-	Formula   string      // only formula or value can be loaded
-	Value     interface{} // if hyperlink, value is what's displayed in cell
-	Hyperlink *Hyperlink
-}
-```
-
-## RowValues Func
-Makes it easy to reference cell values on a row. It returns returns a map where the key is columnName and cell value is string type. 
 
 ## Example Code - CopyRows Func
 ```
@@ -107,27 +93,7 @@ func CopyRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *CopyO
 }
 ```
 
-## Example Code - Update A Row
-Update Status column of a row in the "Tasks" sheet.
-Also change it's location to last child of different parent row and lock it.  
-To update multiple rows using 1 API call. Use SheetInfo.UpdateRow and UploadeUpdateRow methods.
-```
-var sheetTasks *SheetInfo  // loaded by other code
-
-location := RowLocation{ ParentId:parentRowId, ToBottom:true }  // parentRowId is int64 var
-
-updateCells := make([]NewCell,1)  // this example is updating 1 cell in the row
-
-updateCells[0] := NewCell{     // create update cell
-    ColName: "Status",
-    Value:   "Hold",
-}
-locked := true
-
-UpdateRow(sheetTasks, rowId, updateCells, &location, locked )
-```
-
 ## A Few Go Notes
-Slices and Maps, if declared but not initialized (using make or initial values), have value = nil.  
-If "len" or "range" are used with nil slice or map, it is treated as having zero entries and works properly.
-Struct and bool types do not have a "zero" value, so pointers may be used, where nil means no value.  
+Slices and Maps, if declared but not initialized (using make or initial values), have value = nil. If "len" or "range" are used with nil slice or map, it is treated as having zero entries and works properly. Other uses of the slice or map will probably cause an error.
+  
+The "omitempty" field tag option specifies that the field should be omitted from the encoding if the field has an empty value, defined as false, 0, a nil pointer, a nil interface value, and any empty array, slice, map, or string. To omit a struct type use a pointer to the type instead. To not omit numbers with value 0 and bools with value false, also use a pointer type.

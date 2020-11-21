@@ -1,6 +1,6 @@
 # Smartsheet Go Mini-SDK
 
-Status as of 11/18/2020 > Active refactoring and testing. Not stable, but mostly working.
+Status as of 11/21/2020 > Passing All Tests in sheetinfo_test, row_test. More tests to be added.
 
 Tools for interacting with the Smartsheet API using the Go language.
 
@@ -140,8 +140,8 @@ Func RowValues returns the cell values of a row as a map[string]string. Key of e
 sheetX.Load(sheetXId, nil)  // loads all rows
 for i, row := range sheetX.Rows {
 	fmt.Println("Row Id", row.Id)
-	rowCells := RowValues(sheetX, row)   // rowCells is type map[string]string
-	fmt.Println(i, rowCells["Customer"], " - ", rowCells["Address"])  // ex. 1 TopButton - 1200 Canton Road
+	vals := RowValues(sheetX, row)   // vals is type map[string]string
+	fmt.Println(i, vals["Customer"], " - ", vals["Address"])  // ex. 1 TopButton - 1200 Canton Road
 }
 ```
 
@@ -173,8 +173,8 @@ row, err := GetRow(sheetId, rowId)
 ### AddRow, UpdateRow Funcs
 Add or Update 1 row via API. See AddRow, UpdateRow SheetInfo discussion above for details.
 ```
-result, err := AddRow(sheetX, newRow, &location)
-result, err := UpdateRow(sheetX, updtRow, &location)
+response, err := AddRow(sheetX, newRow, &location)
+response, err := UpdateRow(sheetX, updtRow, &location)
 ```
 
 ### SetParentId Func
