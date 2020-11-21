@@ -168,6 +168,15 @@ func series3() error {
 		ColumnNames:       []string{"Address", "Status", "DueDate"},
 	}
 	err = sheet.Load(sheetId, &getOptions)
+	if err != nil {
+		return err
+	}
+	sheet.Show()
+
+	getOptions = GetSheetOptions{
+		RowIds: []int64{3360466516633476},
+	}
+	err = sheet.Load(sheetId, &getOptions)
 	sheet.Show()
 	return err
 }
