@@ -45,8 +45,9 @@ func GetRow(sheetId, rowId int64) (*Row, error) {
 // AddRow adds 1 row to specified sheet.
 // If location is nil, row added to bottom of sheet.
 // SheetInfo is used to convert columnNames to columnIds and must contain SheetId.
-func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowsResponse, error) {
+func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowResponse, error) {
 	trace("AddRow")
+
 	// load Cell.ColumnId using Cell.colName
 	for i := 0; i < len(newRow.Cells); i++ {
 		colName := newRow.Cells[i].ColName
@@ -57,11 +58,14 @@ func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowsRe
 		}
 		newRow.Cells[i].ColumnId = column.Id
 	}
+
+	// create row location map
 	locMap := map[string]interface{}{"toBottom": true}
 	if location != nil {
 		locMap = CreateLocationMap(location) // see util.go
 	}
-	// -- Create Request Body ----------------
+
+	// -- create request body ----------------
 	reqData := make(map[string]interface{})
 	reqData["cells"] = newRow.Cells
 	if newRow.Locked != nil { // newRow.Locked is *bool
@@ -70,6 +74,8 @@ func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowsRe
 	for k, v := range locMap { // set row location attributes, all rows use same location
 		reqData[k] = v
 	}
+
+	// -- create & process api request -----------
 	endPoint := fmt.Sprintf("/sheets/%d/rows", sheet.SheetId)
 	req := Post(endPoint, reqData, nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -81,13 +87,15 @@ func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowsRe
 	defer resp.Body.Close()
 
 	respJSON, _ := ioutil.ReadAll(resp.Body)
-	result := new(AddUpdtRowsResponse) // same response object when adding or updating rows
-	err = json.Unmarshal(respJSON, result)
+	debugLn(string(respJSON))
+
+	apiResp := new(AddUpdtRowResponse) // add 1 row resp.Result is type Row not []Row
+	err = json.Unmarshal(respJSON, apiResp)
 	if err != nil {
 		log.Println("ERROR - AddRow Unmarshal Response Failed", err)
 		return nil, err
 	}
-	return result, nil
+	return apiResp, nil
 }
 
 // UpdataRow updates 1 row in specified sheet.
@@ -96,7 +104,8 @@ func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowsRe
 // Omit lockRow parm to leave lock status unchanged.
 func UpdateRow(sheet *SheetInfo, updtRow Row, location *RowLocation) (*AddUpdtRowsResponse, error) {
 	trace("UpdateRow")
-	// load Cell.ColumnId using Cell.colName
+
+	// -- load Cell.ColumnId using Cell.colName -------------
 	for i := 0; i < len(updtRow.Cells); i++ {
 		colName := updtRow.Cells[i].ColName
 		column, found := sheet.ColumnsByName[colName]
@@ -106,11 +115,14 @@ func UpdateRow(sheet *SheetInfo, updtRow Row, location *RowLocation) (*AddUpdtRo
 		}
 		updtRow.Cells[i].ColumnId = column.Id
 	}
-	locMap := map[string]interface{}{"toBottom": true}
+
+	// -- create row location map ----------------
+	var locMap map[string]interface{}
 	if location != nil {
 		locMap = CreateLocationMap(location) // see util.go
 	}
-	// -- Create Request Body ----------------
+
+	// -- create request body ----------------
 	reqData := make(map[string]interface{})
 	reqData["id"] = strconv.FormatInt(updtRow.Id, 10) // api expects row id to be a string, don't know why
 	reqData["cells"] = updtRow.Cells
@@ -121,6 +133,7 @@ func UpdateRow(sheet *SheetInfo, updtRow Row, location *RowLocation) (*AddUpdtRo
 		reqData[k] = v
 	}
 
+	// -- create api request & process ------------------
 	endPoint := fmt.Sprintf("/sheets/%d/rows", sheet.SheetId)
 	req := Put(endPoint, reqData, nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -132,13 +145,14 @@ func UpdateRow(sheet *SheetInfo, updtRow Row, location *RowLocation) (*AddUpdtRo
 	defer resp.Body.Close()
 
 	respJSON, _ := ioutil.ReadAll(resp.Body)
-	result := new(AddUpdtRowsResponse) // same response object when adding or updating rows
-	err = json.Unmarshal(respJSON, result)
+	debugLn(string(respJSON))
+	apiResp := new(AddUpdtRowsResponse) // update response.Result is always type []Row
+	err = json.Unmarshal(respJSON, apiResp)
 	if err != nil {
 		log.Println("ERROR - UpdateRow Unmarshal Response Failed", err)
 		return nil, err
 	}
-	return result, nil
+	return apiResp, nil
 }
 
 // DeleteRows removes specified rowsIds from sheet.

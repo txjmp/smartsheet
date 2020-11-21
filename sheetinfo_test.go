@@ -31,12 +31,14 @@ func Test_SheetInfo(t *testing.T) {
 	//DebugOn = true
 
 	if err = series1(); err != nil {
-		t.Error("series1 Failed", err)
+		t.Error("Test_SheetInfo series1 Failed", err)
 	}
 	if err = series2(); err != nil {
-		t.Error("series2 Failed", err)
+		t.Error("Test_SheetInfo series2 Failed", err)
 	}
-
+	if err = series3(); err != nil {
+		t.Error("Test_SheetInfo series3 Failed", err)
+	}
 }
 
 func setToken() {
@@ -150,5 +152,22 @@ func series2() error {
 	sheet.Load(sheetId, nil)
 	sheet.Show()
 
+	return err
+}
+
+// Use GetSheetOptions to limit rows returned
+func series3() error {
+	var err error
+
+	sheetId := Test2Id
+	sheet := new(SheetInfo)
+	sheet.Load(sheetId, NoRows)
+
+	getOptions := GetSheetOptions{
+		RowsModifiedSince: time.Now().Add(-20 * time.Minute),
+		ColumnNames:       []string{"Address", "Status", "DueDate"},
+	}
+	err = sheet.Load(sheetId, &getOptions)
+	sheet.Show()
 	return err
 }

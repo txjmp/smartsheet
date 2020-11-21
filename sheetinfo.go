@@ -182,7 +182,9 @@ func (she *SheetInfo) UpdateRow(updtRow Row) error {
 // Currently parent rows should contain "0" and child rows should contain "1" in this field/column.
 func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...string) (*AddUpdtRowsResponse, error) {
 	trace("UploadNewRows")
-
+	if len(she.NewRows) == 0 {
+		return nil, nil
+	}
 	locMap := map[string]interface{}{"toBottom": true}
 	if location != nil {
 		locMap = CreateLocationMap(location) // see util.go
@@ -213,8 +215,25 @@ func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...stri
 	defer resp.Body.Close()
 
 	respJSON, _ := ioutil.ReadAll(resp.Body)
-	result1 := new(AddUpdtRowsResponse) // same response object when adding or updating rows
-	err = json.Unmarshal(respJSON, result1)
+
+	if len(she.NewRows) == 1 { // response.Result is 1 row (not a slice) when adding 1 row
+		apiResp1 := new(AddUpdtRowResponse) // same response object when adding or updating row
+		err = json.Unmarshal(respJSON, apiResp1)
+		if err != nil {
+			log.Println("ERROR - UploadAddRows Unmarshal Response for Single Row Failed", err)
+			return nil, err
+		}
+		she.NewRows = nil
+		apiResp := AddUpdtRowsResponse{
+			Message:    apiResp1.Message,
+			ResultCode: apiResp1.ResultCode,
+			Result:     []Row{apiResp1.Result},
+		}
+		return &apiResp, nil
+	}
+
+	apiResp := new(AddUpdtRowsResponse) // same response object when adding or updating rows
+	err = json.Unmarshal(respJSON, apiResp)
 	if err != nil {
 		log.Println("ERROR - UploadAddRows Unmarshal Response Failed", err)
 		return nil, err
@@ -223,21 +242,22 @@ func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...stri
 	defer func() {
 		she.NewRows = nil
 	}()
+
 	if len(rowLevelField) == 0 {
-		return result1, nil
+		return apiResp, nil
 	}
 	// -------------------------------------------------------------------
 	// IF OPTIONAL ROWLEVELFIELD SPECIFIED, SET PARENTID ON CHILD ROWS
 	//   parent rows: Level 0
 	//   child rows: Level 1
-	//   child rows must be immediately after parent row in response
+	//   child rows must be immediately after parent row in prev api response
 	debugLn("Set ParentId on Child Rows ---")
 	var parentId int64
 	var childIds []int64
-	for _, row := range result1.Result {
+	for _, row := range apiResp.Result {
 		rowLevel, err := she.GetRowLevel(row, rowLevelField[0])
 		if err != nil {
-			return result1, err
+			return apiResp, err
 		}
 		debugLn("rowLevel", rowLevel)
 		if rowLevel == "0" { // if header row
@@ -258,7 +278,7 @@ func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...stri
 	if len(childIds) > 0 {
 		err = SetParentId(she, parentId, childIds) // indent child rows for prev parent
 	}
-	return result1, err
+	return apiResp, err
 }
 
 // getRowLevel returns the value of cell containing a rows parent-child indicator.
@@ -319,14 +339,15 @@ func (she *SheetInfo) UploadUpdateRows(location *RowLocation) (*AddUpdtRowsRespo
 	defer resp.Body.Close()
 
 	respJSON, _ := ioutil.ReadAll(resp.Body)
-	result := new(AddUpdtRowsResponse) // same response object when adding or updating rows
-	err = json.Unmarshal(respJSON, result)
+
+	apiResp := new(AddUpdtRowsResponse) // same response object when adding or updating rows
+	err = json.Unmarshal(respJSON, apiResp)
 	if err != nil {
 		log.Println("ERROR - UploadUpdateRows Unmarshal Response Failed", err)
 		return nil, err
 	}
 	she.UpdateRows = nil
-	return result, err
+	return apiResp, nil
 }
 
 // CreateCrossSheetReference creates an external-sheet-reference required for cross sheet formulas.
