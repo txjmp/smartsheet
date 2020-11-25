@@ -1,5 +1,8 @@
 package smartsheet
 
+// InitRow returns new instance of Row.
+// If optional parm rowId specified, row.Id field is loaded.
+// Row.Cells is also initialized.
 func InitRow(rowId ...int64) Row {
 	var newRow Row
 	if len(rowId) > 0 {
@@ -10,6 +13,8 @@ func InitRow(rowId ...int64) Row {
 }
 
 // CreateLocationMap accepts struct type RowLocation and returns a map.
+// Map keys match api location specifier values.
+// Fields with value of 0 or false are not included in the map.
 func CreateLocationMap(location *RowLocation) map[string]interface{} {
 
 	locMap := make(map[string]interface{})

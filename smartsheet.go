@@ -1,7 +1,9 @@
+// Package smartsheet provides tools for interacting with the Official Smartsheet API.
 package smartsheet
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,11 +15,11 @@ import (
 	"time"
 )
 
-var DebugOn bool = false // calling package can turn these on/off as needed
-var TraceOn bool = false
+var DebugOn bool = false // caller can turn on/off as needed
+var TraceOn bool = false // caller can turn on/off as needed
 
-var IsTrue bool = true // address of this var is used when setting boolean pointer values
-var IsFalse bool = false
+var IsTrue bool = true   // address of this var is used when setting boolean pointer values
+var IsFalse bool = false // address of this var is used when setting boolean pointer values
 
 const (
 	DateFormat = "2006-01-02"
@@ -32,8 +34,8 @@ const (
 	ONEDRIVE    = "ONEDRIVE"
 )
 
-// GetSheet downloads specified sheet info based on GetSheetOptions.
-// Typically Load() method of SheetInfo instance is used to call GetSheet.
+// GetSheet downloads specified sheet info based on GetSheetOptions and returns *Sheet.
+// Typically called by SheetInfo.Load().
 // If options is nil, all rows and columns are requested.
 // Cells never containing a value are automatically excluded.
 func GetSheet(sheetId int64, options *GetSheetOptions) (*Sheet, error) {
@@ -82,7 +84,8 @@ func GetSheet(sheetId int64, options *GetSheetOptions) (*Sheet, error) {
 	sheet := new(Sheet)
 	err = json.Unmarshal(respJSON, sheet)
 	if err != nil {
-		log.Panicln("GetSheet JSON Unmarshal Error - ", err)
+		log.Println("ERROR GetSheet JSON Unmarshal Failed - ", err)
+		return nil, err
 	}
 	return sheet, err
 }
@@ -114,12 +117,12 @@ func GetSheetRows(sheetId int64, filePath string) error {
 	return err
 }
 
-// RowValues returns a single row's cell values as map[string]string.
+// RowValues returns a row's cell values as map[string]string.
 // The key of each entry is column name.
 // If cell contains hyperlink, the url is returned as entry value.
 // If cell contains multiple values, all values are concatenated into 1 string, ex: "light, sour".
 // If cell contains number value, it is converted to string (formatting such as $, commas are not included).
-// Cells with no value have entry value of empty string, "".
+// Cells with no value have an entry value of empty string, "".
 // Formula cells return the computed value (not the formula).
 // Use func CellInfo() to access all cell attributes.
 func RowValues(sheet *SheetInfo, row Row) map[string]string {
@@ -151,7 +154,8 @@ func RowValues(sheet *SheetInfo, row Row) map[string]string {
 // Parm columnName determines which cell in row to return. Must be in sheet.ColumnNames.
 // Parm row is the row containing the cell. It is not required to be in sheet.Rows.
 // Type Cell provides access to all cell attributes, such as formula which is not returned by RowValues().
-// Cell is not required to exist for requested columnName.
+// If requested cell does not exist in the row an empty Cell is returned.
+// If columnName is not in sheet.ColumnsByName map, an error is logged and nil is returned.
 func CellInfo(sheet *SheetInfo, row Row, columnName string) *Cell {
 	response := new(Cell)
 	column, found := sheet.ColumnsByName[columnName]
@@ -262,6 +266,10 @@ func MoveRows(fromSheetId int64, rowIds []int64, toSheetId int64, options *MoveO
 func SetParentId(sheet *SheetInfo, parentId int64, childIds []int64, toBottom ...bool) error {
 	trace("SetParentId")
 
+	if sheet.SheetId == 0 {
+		log.Println("ERROR SetParentId - sheet.SheetId not set")
+		return errors.New("sheet.SheetId empty")
+	}
 	if len(childIds) == 0 {
 		log.Println("SetParentId - No ChildIds Specified")
 		return nil
@@ -291,7 +299,7 @@ func SetParentId(sheet *SheetInfo, parentId int64, childIds []int64, toBottom ..
 	return nil
 }
 
-// GetCrossSheetRefs displays cross sheet ref info for sheet.
+// GetCrossSheetRefs displays cross sheet references for sheet.
 func GetCrossSheetRefs(sheetId int64) error {
 	endPoint := fmt.Sprintf("/sheets/%d/crosssheetreferences", sheetId)
 	req := Get(endPoint, nil)
@@ -306,10 +314,10 @@ func GetCrossSheetRefs(sheetId int64) error {
 	return nil
 }
 
-// AttachFileToRow attaches file to row.
-// Parm filePath specifies local system file to be attached
-// File is uploaded to Smartsheet.
-// Expensive operation. Counts as 10 interactions. See API Limits documentation for details.
+// AttachFileToRow attaches a file to the specified row.
+// Parm filePath specifies local system file to be attached.
+// File is uploaded to Smartsheet's storage.
+// Expensive operation, occurs 10 additional requests against rate limit.
 func AttachFileToRow(sheetId, rowId int64, filePath string) error {
 	trace("AttachFileToRow")
 
@@ -341,11 +349,11 @@ func AttachFileToRow(sheetId, rowId int64, filePath string) error {
 	return nil
 }
 
-// AttachUrlToRow attaches url link to a row.
+// AttachUrlToRow attaches a url link to a row.
+// Parm attachmentName is a reference name for user.
+// Parm attachmentType uses one of the following constants: LINK,BOX,DROPBOX,EVERNOTE,GOOGLEDRIVE,ONEDRIVE
 func AttachUrlToRow(sheetId, rowId int64, attachmentName, attachmentType, linkUrl string) error {
 	trace("AttachUrlToRow")
-
-	//'{"name":"Search Engine", "description": "A popular search engine", "attachmentType":"LINK", "url":"http://www.google.com"}'
 
 	var reqData struct {
 		Name           string `json:"name"`

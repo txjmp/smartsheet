@@ -10,7 +10,6 @@ import (
 )
 
 // SheetInfo contains information about a sheet and methods for interacting with it.
-// See Load() method for details on what is loaded.
 type SheetInfo struct {
 	SheetId        int64
 	SheetName      string
@@ -26,7 +25,7 @@ type SheetInfo struct {
 
 // Load method downloads sheet info by calling GetSheet func and pulling data from the returned sheet info.
 // Optional GetSheetOptions is defined in options.go.
-// If only specific columns are needed, options.ColumnNames are converted to ColumnIds
+// If only specific columns are needed, options.ColumnNames are converted to ColumnIds.
 func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) error {
 
 	// if specified, convert columnNames to columnIds
@@ -35,7 +34,7 @@ func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) error {
 		for i, colName := range options.ColumnNames {
 			column, found := she.ColumnsByName[colName]
 			if !found {
-				log.Println("SheetInfo.Load Invalid ColName in options", colName)
+				log.Println("ERROR SheetInfo.Load Invalid ColName in options", colName)
 				return errors.New("Invalid ColName - " + colName)
 			}
 			options.ColumnIds[i] = column.Id
@@ -43,7 +42,7 @@ func (she *SheetInfo) Load(sheetId int64, options *GetSheetOptions) error {
 	}
 	sheet, err := GetSheet(sheetId, options)
 	if err != nil {
-		log.Println("SheetInfo.load failed", she.SheetName, she.SheetId, err)
+		log.Println("ERROR SheetInfo.load failed", she.SheetName, she.SheetId, err)
 		return err
 	}
 	she.SheetId = sheet.Id
@@ -130,8 +129,6 @@ func (she *SheetInfo) Show(rowLimit ...int) {
 }
 
 // AddRow adds a row to SheetInfo.NewRows.
-// A row consists of slice of Cell objects and optional locked indicator.
-// Do not set lockRow unless new row is to be locked.
 // All added rows are processed in a batch using UploadNewRows() method.
 func (she *SheetInfo) AddRow(newRow Row) error {
 	trace("SheetInfo.AddRow")
@@ -153,8 +150,6 @@ func (she *SheetInfo) AddRow(newRow Row) error {
 }
 
 // UpdateRow adds a row to SheetInfo.UpdateRows.
-// A row consists of rowId, slice of Cell objects, and locked indicator.
-// Leave locked field as nil, unless lock status is to be changed.
 // All updated rows are processed in a batch using UploadUpdateRows() method.
 func (she *SheetInfo) UpdateRow(updtRow Row) error {
 	trace("SheetInfo.UpdateRow")
@@ -178,11 +173,12 @@ func (she *SheetInfo) UpdateRow(updtRow Row) error {
 // UploadNewRows adds new rows to sheet using SheetInfo.NewRows.
 // After process is complete, NewRows is set to nil.
 // If location is nil, rows added to bottom of sheet.
-// If rowLevelField is specified, each group of child rows will be indented (using SetParentId), based on value of rowLevelField.
-// Currently parent rows should contain "0" and child rows should contain "1" in this field/column.
+// If optional rowLevelField is specified, each group of child rows will be indented (using SetParentId), based on value of rowLevelField.
+// Parent rows must contain "0" and child rows must contain "1" in this field/column.
 func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...string) (*AddUpdtRowsResponse, error) {
 	trace("UploadNewRows")
 	if len(she.NewRows) == 0 {
+		log.Println("UploadNewRows .NewRows is empty")
 		return nil, nil
 	}
 	locMap := map[string]interface{}{"toBottom": true}
@@ -217,7 +213,7 @@ func (she *SheetInfo) UploadNewRows(location *RowLocation, rowLevelField ...stri
 	respJSON, _ := ioutil.ReadAll(resp.Body)
 
 	if len(she.NewRows) == 1 { // response.Result is 1 row (not a slice) when adding 1 row
-		apiResp1 := new(AddUpdtRowResponse) // same response object when adding or updating row
+		apiResp1 := new(Add1RowResponse)
 		err = json.Unmarshal(respJSON, apiResp1)
 		if err != nil {
 			log.Println("ERROR - UploadAddRows Unmarshal Response for Single Row Failed", err)

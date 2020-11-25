@@ -29,4 +29,5 @@ type GetSheetOptions struct {
 	ColumnIds         []int64   // include only specified columns
 }
 
-var NoRows = &GetSheetOptions{RowIds: []int64{0}} // for convenience, to specify no rows should be returned
+// NoRows is a convenience value when requesting no rows be returned by SheetInfo.Load().
+var NoRows = &GetSheetOptions{RowIds: []int64{0}}

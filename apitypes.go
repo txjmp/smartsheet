@@ -2,7 +2,7 @@
 
 package smartsheet
 
-// Hyperlink cell field stores link information.
+// Hyperlink is used in Row Cells to store hyperlink information.
 // The link can be to a URL, Sheet, or Report.
 type Hyperlink struct {
 	Reportid int64  `json:"reportId,omitempty"`
@@ -18,6 +18,7 @@ type CellLink struct {
 	Status   string `json:"status"`
 }
 
+// Column contains values from API Get Sheet.
 type Column struct {
 	Id      int64    `json:"id"`
 	Index   int      `json:"index"`
@@ -27,7 +28,8 @@ type Column struct {
 	Options []string `json:"options"`
 }
 
-// Cell is used in both api responses and api requests.
+// Cell contains cell values.
+// It is used in both api responses and requests.
 // It is also used when adding and updating rows. See SheetInfo.AddRow, UpdateRow.
 type Cell struct {
 	ColName         string      `json:"-"` // not used by API
@@ -39,15 +41,17 @@ type Cell struct {
 	Value           interface{} `json:"value,omitempty"`
 }
 
-// Row is used in api responses but not api requests.
-// It is also used when adding and updating rows. See SheetInfo.NewRows, UpdateRows.
-// For row add/update requests, a dynamic object is created using map[string]interface{} (includes row location fields).
+// Row is used in api responses but not directly in api requests.
+// It is used when adding and updating rows. See SheetInfo.AddRow, UpdateRow.
 type Row struct {
 	Id     int64  `json:"id"`
 	Cells  []Cell `json:"cells"`
 	Locked *bool  `json:"locked"` // when updating rows: nil-nochange, false-unlock, true-lock
 }
 
+// Sheet is the api response for GetSheet.
+// It is not typically directly used by other processes.
+// See SheetInfo type, which contains these Sheet values.
 type Sheet struct {
 	Id            int64  `json:"id"`
 	Name          string `json:"name"`
@@ -72,15 +76,15 @@ type CrossSheetReference struct {
 	EndColumnId   int64  `json:"endColumnId"`
 }
 
-// Response object for Adding or Updating Rows
+// AddUpdtRowsResponse is api response object when adding mutiple rows or updating 1 or more rows.
 type AddUpdtRowsResponse struct {
 	Message    string `json:"message"`    // ex. "SUCCESS"
 	ResultCode int    `json:"resultCode"` // ex. 0
 	Result     []Row  `json:"result"`
 }
 
-// Response object for Adding or Updating 1 Row
-type AddUpdtRowResponse struct {
+// Add1RowResponse is api response object when adding 1 row.
+type Add1RowResponse struct {
 	Message    string `json:"message"`    // ex. "SUCCESS"
 	ResultCode int    `json:"resultCode"` // ex. 0
 	Result     Row    `json:"result"`

@@ -1,9 +1,3 @@
-// Contains row related funcs not handled by SheetInfo methods.
-// GetRow - returns 1 row from sheet
-// AddRow - adds 1 row to sheet (use SheetInfo for multiple rows)
-// UpdateRow - updates 1 row in sheet (use SheetInfo for multiple rows)
-// DeleteRows - deletes 1 or more rows
-
 package smartsheet
 
 import (
@@ -43,11 +37,15 @@ func GetRow(sheetId, rowId int64) (*Row, error) {
 }
 
 // AddRow adds 1 row to specified sheet.
-// If location is nil, row added to bottom of sheet.
-// SheetInfo is used to convert columnNames to columnIds and must contain SheetId.
-func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowResponse, error) {
+// If location is nil, row is added to bottom of sheet.
+// Parm sheet is used to convert columnNames to columnIds and must contain SheetId.
+func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*Add1RowResponse, error) {
 	trace("AddRow")
 
+	if sheet.SheetId == 0 {
+		log.Println("ERROR AddRow - sheet.SheetId not set")
+		return nil, errors.New("sheet.SheetId empty")
+	}
 	// load Cell.ColumnId using Cell.colName
 	for i := 0; i < len(newRow.Cells); i++ {
 		colName := newRow.Cells[i].ColName
@@ -89,7 +87,7 @@ func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowRes
 	respJSON, _ := ioutil.ReadAll(resp.Body)
 	debugLn(string(respJSON))
 
-	apiResp := new(AddUpdtRowResponse) // add 1 row resp.Result is type Row not []Row
+	apiResp := new(Add1RowResponse) // add 1 row resp.Result is type Row not []Row
 	err = json.Unmarshal(respJSON, apiResp)
 	if err != nil {
 		log.Println("ERROR - AddRow Unmarshal Response Failed", err)
@@ -101,10 +99,13 @@ func AddRow(sheet *SheetInfo, newRow Row, location *RowLocation) (*AddUpdtRowRes
 // UpdataRow updates 1 row in specified sheet.
 // If location is nil, row location is not changed.
 // SheetInfo is used to convert columnNames to columnIds and must contain SheetId.
-// Omit lockRow parm to leave lock status unchanged.
 func UpdateRow(sheet *SheetInfo, updtRow Row, location *RowLocation) (*AddUpdtRowsResponse, error) {
 	trace("UpdateRow")
 
+	if sheet.SheetId == 0 {
+		log.Println("ERROR UpdateRow - sheet.SheetId not set")
+		return nil, errors.New("sheet.SheetId empty")
+	}
 	// -- load Cell.ColumnId using Cell.colName -------------
 	for i := 0; i < len(updtRow.Cells); i++ {
 		colName := updtRow.Cells[i].ColName

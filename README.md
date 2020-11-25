@@ -1,6 +1,6 @@
 # Smartsheet Go Mini-SDK
 
-Status as of 11/21/2020 > Passing All Tests in sheetinfo_test, row_test. More tests to be added.
+Status as of 11/25/2020 > Passing All Tests in sheetinfo_test, row_test. Will be adding more tests.
 
 Tools for interacting with the Smartsheet API using the Go language.
 
@@ -11,15 +11,16 @@ No 3rd party packages are needed.
 
 The SheetInfo type contains most of the information about a sheet including definitions (column ids/names/types) and data (rows). It also has methods for interacting with a sheet.
 
-GoDoc documentation will provide complete type and func details. This document is intended to explain functionality in a more concise and easy to understand format.
+GoDoc documentation provides complete type and func details. This document is intended to explain functionality in a concise and easy to understand format.  
+[GODOC](https://godoc.org/github.com/txjmp/smartsheet)
 
 **To use this package, global var Token must be set with your access token**.
 ```  
 Token = "Bearer youraccesstoken"
 ```
 
-## Examples
-
+## Examples  ( also see _test files )
+  
 ### Create an instance of SheetInfo, Load It Via the API, Store It, and Show It
 ```
 sheetX := new(SheetInfo)
@@ -193,7 +194,6 @@ err := AttachUrlToRow(sheetId, rowId, attachmentName, attachmentType, linkUrl)
 ```
 Create,List CrossSheetReferences (required for Cross Sheet Formulas)
 Create,Enable,Get,Delete Webhooks
-Code to process Webhook requests using Go built-in web server (not in this package)
 ```
 
 ### Types

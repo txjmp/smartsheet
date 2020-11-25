@@ -25,7 +25,9 @@ var testData = []rec{
 
 func Test_SheetInfo(t *testing.T) {
 	var err error
-	setToken()
+
+	tkn, _ := ioutil.ReadFile("token.txt")
+	Token = strings.TrimSpace(string(tkn))
 
 	//TraceOn = true
 	//DebugOn = true
@@ -39,11 +41,6 @@ func Test_SheetInfo(t *testing.T) {
 	if err = series3(); err != nil {
 		t.Error("Test_SheetInfo series3 Failed", err)
 	}
-}
-
-func setToken() {
-	tkn, _ := ioutil.ReadFile("token.txt")
-	Token = strings.TrimSpace(string(tkn))
 }
 
 // Load, Store, Restore, Match
