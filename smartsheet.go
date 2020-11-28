@@ -32,6 +32,9 @@ const (
 	EVERNOTE    = "EVERNOTE"
 	GOOGLEDRIVE = "GOOGLE_DRIVE"
 	ONEDRIVE    = "ONEDRIVE"
+	PDF         = "pdf"
+	EXCEL       = "excel"
+	CSV         = "csv"
 )
 
 // GetSheet downloads specified sheet info based on GetSheetOptions and returns *Sheet.
@@ -90,13 +93,28 @@ func GetSheet(sheetId int64, options *GetSheetOptions) (*Sheet, error) {
 	return sheet, err
 }
 
-// GetSheetRows creates csv file containing row data, 1st line is column headers.
-func GetSheetRows(sheetId int64, filePath string) error {
+// GetSheetAs creates file containing all rows, 1st line is column headers.
+// Use const CSV, EXCEL, or PDF for parm "format".
+// Optional paperSize parm can only be used with PDF format. See API doc for choices.
+func GetSheetAs(sheetId int64, filePath string, format string, paperSize ...string) error {
 
+	var urlParms map[string]string
+	if len(paperSize) > 0 {
+		urlParms = map[string]string{"paperSize": paperSize[0]}
+	}
 	endPoint := fmt.Sprintf("/sheets/%d", sheetId)
-	req := Get(endPoint, nil)
-	req.Header.Set("Accept", "text/csv")
+	req := Get(endPoint, urlParms)
 
+	switch format {
+	case EXCEL:
+		req.Header.Set("Accept", "application/vnd.ms-excel")
+	case CSV:
+		req.Header.Set("Accept", "text/csv")
+	case PDF:
+		req.Header.Set("Accept", "application/pdf")
+	default:
+		return errors.New("Invalid Format - " + format)
+	}
 	resp, err := DoRequest(req)
 	if err != nil {
 		return err
@@ -105,14 +123,14 @@ func GetSheetRows(sheetId int64, filePath string) error {
 
 	file, err := os.Create(filePath)
 	if err != nil {
-		log.Println("Smartsheet GetSheetRows Error, Creating Local File - ", err)
+		log.Println("ERROR GetSheetAs Failed Creating Local File - ", err)
 		return err
 	}
 	defer file.Close()
 
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
-		log.Println("Smartsheet GetSheetRows Error, Writing Local File - ", err)
+		log.Println("ERROR GetSheetAs Failed Writing Local File - ", err)
 	}
 	return err
 }

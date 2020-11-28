@@ -19,12 +19,19 @@ func Test_Smartsheet(t *testing.T) {
 	TraceOn = true
 	DebugOn = true
 
-	// === CREATE SHEET CSV FILE ===========================================
-	err = GetSheetRows(sheet1Id, "/home/jay/sheets/sheet1.csv")
+	// === CREATE SHEET FILE ===========================================
+	err = GetSheetAs(sheet1Id, "/home/jay/sheets/sheet1.xlsx", EXCEL)
 	if err != nil {
 		t.Fatal("Test_Smartsheet GetSheetRows Failed", err)
 	}
-
+	err = GetSheetAs(sheet1Id, "/home/jay/sheets/sheet1.pdf", PDF, "WIDE")
+	if err != nil {
+		t.Fatal("Test_Smartsheet GetSheetRows Failed", err)
+	}
+	err = GetSheetAs(sheet1Id, "/home/jay/sheets/sheet1.csv", CSV)
+	if err != nil {
+		t.Fatal("Test_Smartsheet GetSheetRows Failed", err)
+	}
 	// === CELLINFO ===========================================
 	sheet1 := new(SheetInfo)
 	//sheet1.Load(sheet1Id, nil)
