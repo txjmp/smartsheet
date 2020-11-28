@@ -1,6 +1,6 @@
 # Smartsheet Go Mini-SDK
 
-Status as of 11/25/2020 > Passing All Tests in sheetinfo_test, row_test. Will be adding more tests.
+Status as of 11/27/2020 > Passing All Tests in sheetinfo_test, row_test, smartsheet_test
 
 Tools for interacting with the Smartsheet API using the Go language.
 
