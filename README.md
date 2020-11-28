@@ -4,6 +4,12 @@ Status as of 11/27/2020 > Passing All Tests in sheetinfo_test, row_test, smartsh
 
 Tools for interacting with the Smartsheet API using the Go language.
 
+Install & Use
+```
+go get github.com/txjmp/smartsheet
+import smar "github.com/txjmp/smartsheet"
+sheet := new(smar.SheetInfo)
+```
 This package is not likely to ever implement all Smartsheet API features. To facilitate adding your own features, see CODEINFO.md. It attempts to explain how the code is organized and patterns used.  
 [CODEINFO](https://github.com/txjmp/smartsheet/blob/main/CODEINFO.md)
 
