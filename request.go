@@ -16,6 +16,8 @@ var Token string
 
 var RequestDelay time.Duration = 1 * time.Second // delay between API requests, maximum of 100 requests per minute
 
+// Get returns a GET http.Request object.
+// UrlParms are added to the URL as Query parameters.
 func Get(endPoint string, urlParms map[string]string) *http.Request {
 	url := basePath + endPoint
 	req, _ := http.NewRequest("GET", url, nil)
@@ -30,6 +32,8 @@ func Get(endPoint string, urlParms map[string]string) *http.Request {
 	return req
 }
 
+// Post returns a POST http.Request object.
+// UrlParms are added to the URL as Query parameters.
 func Post(endPoint string, data interface{}, urlParms map[string]string) *http.Request {
 
 	reqBytes, err := json.MarshalIndent(data, "", "  ")
@@ -54,6 +58,8 @@ func Post(endPoint string, data interface{}, urlParms map[string]string) *http.R
 	return req
 }
 
+// Put returns a PUT http.Request object.
+// UrlParms are added to the URL as Query parameters.
 func Put(endPoint string, data interface{}, urlParms map[string]string) *http.Request {
 
 	reqBytes, err := json.MarshalIndent(data, "", "  ")
@@ -78,6 +84,8 @@ func Put(endPoint string, data interface{}, urlParms map[string]string) *http.Re
 	return req
 }
 
+// Delete returns a DELETE http.Request object.
+// UrlParms are added to the URL as Query parameters.
 func Delete(endPoint string, urlParms map[string]string) *http.Request {
 	url := basePath + endPoint
 	req, _ := http.NewRequest("DELETE", url, nil)
@@ -92,6 +100,9 @@ func Delete(endPoint string, urlParms map[string]string) *http.Request {
 	return req
 }
 
+// DoRequest executes the supplied http request and returns the http response.
+// If an error occurs, response info is logged.
+// After request completes, execution is paused (based on RequestDelay value) to throttle request frequency.
 func DoRequest(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Authorization", Token)
 	client := http.Client{}
@@ -99,6 +110,7 @@ func DoRequest(req *http.Request) (*http.Response, error) {
 	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		log.Println("Smartsheet Error, HTTP Request Failed - ", err)
+		log.Println("Http Response StatusCode", resp.StatusCode)
 		log.Println("-- resp Header -----")
 		log.Println(resp.Header)
 		if resp.Body != nil {
