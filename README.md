@@ -20,11 +20,13 @@ The SheetInfo type contains most of the information about a sheet including defi
 GoDoc documentation provides complete type and func details. This document is intended to explain functionality in a concise and easy to understand format.  
 [GODOC](https://godoc.org/github.com/txjmp/smartsheet)
 
-**To use this package, global var Token must be set with your access token**.
-```  
-Token = "Bearer youraccesstoken"
+## Global Variables  
+Typically these values would be set at startup, but if you need to dynamically modify them inside a multi goroutine process, beware a data race condition could occur. It would be fairly simple to add Set funcs that use a lock (sync.Mutex) to prevent the problem.  
 ```
-
+Token = "Bearer youraccesstoken"  // must be set with your access token
+DebugOn, TraceOn  bool            // set to true to activate
+RequestDelay time.Duration = 1 * time.Second  // pause after each api request
+```
 ## Examples  ( also see _test files )
   
 ### Create an instance of SheetInfo, Load It Via the API, Store It, and Show It
